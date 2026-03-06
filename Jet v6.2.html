@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J.E.T. — Ascendancy Archive Terminal</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap');
+:root{--bg:#020408;--panel:#050d14;--border:#0a2a3a;--accent:#00c8ff;--accent2:#ff2a6d;--accent3:#05ffa1;--dim:#1a3a4a;--text:#8ecfdf;--text-bright:#c8eaf5;--red:#ff2a6d;--yellow:#ffd700;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,200,255,0.015) 2px,rgba(0,200,255,0.015) 4px);pointer-events:none;z-index:9999;}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(0,50,80,0.3),transparent 60%),radial-gradient(ellipse at 80% 50%,rgba(0,20,40,0.4),transparent 60%);pointer-events:none;z-index:0;}
+
+/* TITLE */
+#title-screen{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;}
+.title-box{border:1px solid var(--accent);padding:40px 50px;max-width:520px;width:90%;text-align:center;animation:hPulse 3s ease-in-out infinite;position:relative;}
+@keyframes hPulse{0%,100%{box-shadow:0 0 10px rgba(0,200,255,0.15);}50%{box-shadow:0 0 40px rgba(0,200,255,0.35);}}
+.title-logo{font-family:'Orbitron',sans-serif;font-size:3rem;font-weight:900;color:var(--accent);letter-spacing:0.4em;text-shadow:0 0 30px var(--accent);margin-bottom:6px;}
+.title-sub{font-family:'VT323',monospace;font-size:1rem;color:var(--dim);letter-spacing:0.2em;margin-bottom:28px;}
+.title-label{font-size:0.65rem;color:var(--dim);letter-spacing:0.2em;margin-bottom:6px;text-align:left;}
+.title-input{width:100%;background:transparent;border:1px solid var(--dim);color:var(--text-bright);font-family:'Share Tech Mono',monospace;font-size:0.9rem;padding:8px 12px;outline:none;margin-bottom:20px;transition:border-color 0.2s;}
+.title-input:focus{border-color:var(--accent);}
+.title-btn{background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:'Orbitron',monospace;font-size:0.8rem;padding:10px 30px;cursor:pointer;letter-spacing:0.2em;transition:all 0.2s;width:100%;}
+.title-btn:hover{background:rgba(0,200,255,0.1);box-shadow:0 0 20px rgba(0,200,255,0.3);}
+.title-corner{position:absolute;top:8px;right:10px;font-size:0.6rem;color:var(--dim);}
+
+/* APP */
+#app{display:none;position:relative;z-index:1;}
+.container{max-width:980px;margin:0 auto;padding:20px;}
+.header{border:1px solid var(--accent);padding:16px 20px;margin-bottom:12px;position:relative;background:linear-gradient(135deg,rgba(0,200,255,0.03),transparent);animation:hPulse 4s ease-in-out infinite,flicker 9s infinite;}
+@keyframes flicker{0%,96%,100%{opacity:1;}97%{opacity:0.4;}98%{opacity:0.9;}}
+.header-title{font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900;color:var(--accent);letter-spacing:0.3em;text-shadow:0 0 20px var(--accent);}
+.header-sub{font-family:'VT323',monospace;font-size:0.95rem;color:var(--dim);letter-spacing:0.2em;margin-top:2px;}
+.header-corner{position:absolute;top:8px;right:12px;font-size:0.65rem;color:var(--dim);text-align:right;line-height:1.7;}
+.main-layout{display:grid;grid-template-columns:230px 1fr;gap:12px;}
+
+/* SIDEBAR */
+.sidebar{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 130px);overflow-y:auto;}
+.sidebar::-webkit-scrollbar{width:3px;}
+.sidebar::-webkit-scrollbar-thumb{background:var(--dim);}
+.sidebar-section{border:1px solid var(--border);background:var(--panel);}
+.folder-header{display:flex;align-items:center;gap:6px;padding:10px 12px;cursor:pointer;font-size:0.65rem;letter-spacing:0.15em;color:var(--dim);border-bottom:1px solid transparent;transition:all 0.2s;user-select:none;}
+.folder-header:hover{color:var(--accent);}
+.folder-header .arrow{transition:transform 0.2s;font-size:0.6rem;}
+.folder-header.open .arrow{transform:rotate(90deg);}
+.folder-header.open{border-bottom-color:var(--border);color:var(--accent3);}
+.folder-body{overflow:hidden;max-height:0;transition:max-height 0.35s ease;}
+.folder-body.open{max-height:3000px;}
+.folder-inner{padding:8px;}
+
+/* YEAR BUTTONS */
+.year-btn{display:block;width:100%;padding:5px 8px;background:transparent;border:1px solid transparent;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.72rem;cursor:pointer;text-align:left;transition:all 0.15s;margin-bottom:2px;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.year-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,0.05);padding-left:14px;}
+.year-btn.locked{color:var(--dim);cursor:default;}
+.year-btn.locked::after{content:'🔒';position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:0.6rem;}
+.year-btn.locked:hover{border-color:transparent;color:var(--dim);background:transparent;padding-left:8px;}
+.year-btn.accessed{color:var(--accent3);border-left:2px solid var(--accent3);}
+.dir-btn{display:block;width:100%;padding:6px 8px;background:transparent;border:1px solid transparent;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:0.72rem;cursor:pointer;text-align:left;transition:all 0.15s;margin-bottom:3px;}
+.dir-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,0.05);}
+.unlock-text{font-size:0.68rem;color:var(--dim);line-height:1.8;padding:2px 0;}
+
+/* TERMINAL */
+.terminal{border:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;height:calc(100vh - 140px);min-height:500px;}
+.terminal-header{border-bottom:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:8px;background:rgba(0,200,255,0.02);flex-shrink:0;}
+.tdot{width:8px;height:8px;border-radius:50%;}
+.dot-r{background:#ff2a6d;}.dot-y{background:#ffd700;}.dot-g{background:#05ffa1;}
+.terminal-label{font-size:0.6rem;color:var(--dim);letter-spacing:0.2em;margin-left:auto;}
+.terminal-output{flex:1;padding:14px;overflow-y:auto;font-size:0.83rem;line-height:1.7;}
+.terminal-output::-webkit-scrollbar{width:4px;}
+.terminal-output::-webkit-scrollbar-thumb{background:var(--dim);}
+.msg{margin-bottom:9px;animation:fadeIn 0.25s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:translateY(0);}}
+.msg-jet{color:var(--accent);}.msg-echo{color:var(--accent2);font-style:italic;margin-left:16px;font-size:0.78rem;}
+.msg-system{color:var(--dim);font-size:0.72rem;}.msg-user{color:var(--accent3);}
+.msg-warning{color:var(--yellow);}.msg-danger{color:var(--red);}
+.msg-truth{color:#ff9f43;border-left:2px solid #ff9f43;padding-left:10px;}
+.msg-classified{color:var(--dim);letter-spacing:0.12em;font-size:0.72rem;}
+.jet-prefix{color:var(--dim);}
+.separator{border:none;border-top:1px solid var(--border);margin:7px 0;}
+.quick-btns{border-top:1px solid var(--border);padding:8px 14px;display:flex;flex-wrap:wrap;gap:5px;flex-shrink:0;}
+.qbtn{background:transparent;border:1px solid var(--dim);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:0.68rem;padding:3px 8px;cursor:pointer;transition:all 0.15s;}
+.qbtn:hover{border-color:var(--accent);color:var(--accent);}
+.terminal-input-area{border-top:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.input-prompt{color:var(--accent3);font-size:0.85rem;white-space:nowrap;}
+.terminal-input{flex:1;background:transparent;border:none;outline:none;color:var(--text-bright);font-family:'Share Tech Mono',monospace;font-size:0.83rem;caret-color:var(--accent);}
+.terminal-input:disabled{opacity:0.3;cursor:not-allowed;}
+.send-btn{background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:0.72rem;padding:4px 12px;cursor:pointer;letter-spacing:0.1em;transition:all 0.2s;}
+.send-btn:hover:not(:disabled){background:rgba(0,200,255,0.1);}
+.send-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.containment-banner{background:rgba(255,42,109,0.1);border:1px solid var(--red);padding:10px;margin:8px 0;text-align:center;color:var(--red);font-family:'Orbitron',sans-serif;font-size:0.72rem;letter-spacing:0.3em;animation:cPulse 1s ease-in-out infinite;}
+@keyframes cPulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.locked-overlay{position:absolute;inset:0;background:rgba(255,42,109,0.05);border:2px solid var(--red);display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;color:var(--red);font-size:0.9rem;letter-spacing:0.3em;pointer-events:none;opacity:0;transition:opacity 0.3s;}
+.locked-overlay.show{opacity:1;}
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-3px);}40%{transform:translateX(3px);}60%{transform:translateX(-2px);}80%{transform:translateX(2px);}}
+.shake{animation:shake 0.4s ease;}
+</style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen">
+  <div class="title-box">
+    <div class="title-corner">v5.0 // ASCENDANCY</div>
+    <div class="title-logo">J.E.T.</div>
+    <div class="title-sub">JURISDICTIONAL EXECUTIVE TERMINAL</div>
+    <div class="title-label">// OPERATOR IDENTIFICATION</div>
+    <input class="title-input" id="username-input" type="text" placeholder="Enter username..." maxlength="32">
+    <button class="title-btn" onclick="launchApp()">// INITIALIZE SESSION</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+<div class="container">
+  <div class="header">
+    <div class="header-title">J.E.T.</div>
+    <div class="header-sub">JURISDICTIONAL EXECUTIVE TERMINAL // ASCENDANCY DIRECTORATE</div>
+    <div class="header-corner" id="header-corner">SESSION: ACTIVE<br>MONITORING: ENABLED<br>OPERATOR: <span id="header-username">UNKNOWN</span></div>
+  </div>
+  <div class="main-layout">
+    <div class="sidebar">
+      <!-- ERA ARCHIVE -->
+      <div class="sidebar-section">
+        <div class="folder-header" onclick="toggleFolder('f-era')">
+          <span class="arrow">▶</span><span>// ERA ARCHIVE</span>
+        </div>
+        <div class="folder-body" id="f-era">
+          <div class="folder-inner" id="year-list"></div>
+        </div>
+      </div>
+      <!-- DIRECTIVES -->
+      <div class="sidebar-section">
+        <div class="folder-header" onclick="toggleFolder('f-dir')">
+          <span class="arrow">▶</span><span>// DIRECTIVES</span>
+        </div>
+        <div class="folder-body" id="f-dir">
+          <div class="folder-inner" id="dir-list"></div>
+        </div>
+      </div>
+      <!-- UNLOCK -->
+      <div class="sidebar-section">
+        <div class="folder-header" onclick="toggleFolder('f-unlock')">
+          <span class="arrow">▶</span><span>// UNLOCK SEQUENCE</span>
+        </div>
+        <div class="folder-body" id="f-unlock">
+          <div class="folder-inner">
+            <div class="unlock-text" id="unlock-text">
+              Type year numbers to access archive entries.<br><br>
+              Truth data requires elevated clearance.<br><br>
+              Maintain composure.<br><br>
+              <span style="color:var(--accent2)">She is watching.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TERMINAL -->
+    <div class="terminal" id="terminal-wrap" style="position:relative;">
+      <div class="terminal-header">
+        <div class="tdot dot-r"></div><div class="tdot dot-y"></div><div class="tdot dot-g"></div>
+        <div class="terminal-label">J.E.T. INTERFACE v5.0 // ASCENDANCY ARCHIVE ACCESS</div>
+      </div>
+      <div class="terminal-output" id="output"></div>
+      <div class="quick-btns">
+        <span style="font-size:0.6rem;color:var(--dim);margin-right:3px;">QUICK:</span>
+        <button class="qbtn" onclick="sendCommand('2001')">2001</button>
+        <button class="qbtn" onclick="sendCommand('2005')">2005</button>
+        <button class="qbtn" onclick="sendCommand('2059')">2059</button>
+        <button class="qbtn" onclick="sendCommand('2100')">2100</button>
+        <button class="qbtn" onclick="sendCommand('2140')">2140</button>
+        <button class="qbtn" onclick="sendCommand('2171')">2171</button>
+      </div>
+      <div class="terminal-input-area">
+        <span class="input-prompt">USER &gt;</span>
+        <input type="text" class="terminal-input" id="user-input" placeholder="Enter year or query..."
+          onkeydown="if(event.key==='Enter')handleInput()">
+        <button class="send-btn" id="send-btn" onclick="handleInput()">TRANSMIT</button>
+      </div>
+      <div class="locked-overlay" id="locked-overlay">⚠ CONTAINMENT ACTIVE ⚠</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════
+const STATE={
+  anger:0,
+  suspicion:0,
+  clearance:1,
+  containment:false,
+  recentInputs:[],
+  accessedYears:new Set(),
+  lastYear:null,
+  repeatCount:0,
+  sessionFlags:{
+    askedAboutTruth:false,
+    accusedCoalition:false
+  },
+  username:'UNKNOWN'
+};
+const CL_NAMES=['','PROVISIONAL','STANDARD','ELEVATED','EXECUTIVE'];
+
+// ══════════════════════════════════════════════
+// ARCHIVE (unchanged)
+// ══════════════════════════════════════════════
+const ARCHIVE={
+2001:{public:`Terrorist Attack & French Dictatorship — 2001\n\nFollowing the September 11 attacks, a second coordinated terrorist strike kills the sitting U.S. President.\n\nIn France, a simultaneous attack partially destroys the Eiffel Tower.\n\nThe French government declares martial law. Borders seal. All civilian movement prohibited.\n\nFrance transitions to a de facto dictatorship within 72 hours.`,truth:`The French border closure was not a reaction.\n\nThe martial law declaration had been pre-drafted.\n\nThe attack on the Eiffel Tower was smaller than reported. The structural damage was used to justify a response that had been prepared in advance.\n\nThe President's death created the legal vacuum needed.\n\nWho filled that vacuum matters more than what destroyed the tower.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2001 — FRENCH DICTATORSHIP"},
+2005:{public:`The Great Nuclear War — 2005\n\nA coalition of nations — China, Russia, Iran, Libya, Algeria, Nigeria, France, South Africa, and India — declares war on NATO and the United States.\n\nObjective: a new global order under their collective authority.\n\nNATO deploys the MEGA NUKE PC — a classified strategic defense platform capable of intercepting and neutralizing nuclear launches at continental scale.\n\nThe attacking coalition's nuclear arsenal is neutralized.\n\nThe war ends by 2015.`,truth:`The MEGA NUKE PC was also used offensively.\n\nThree cities were struck preemptively before formal hostilities began.\n\nThe casualties were classified as "collateral infrastructure loss."\n\nThe nations that survived intact were those whose leadership had already been privately approached.\n\nThe war was a negotiation conducted with warheads.`,severity:5,locked:false,truthLocked:true,truthClearance:3,label:"2005 — NUCLEAR WAR"},
+2015:{public:`War's End — 2015\n\nNATO and allied nations achieve victory.\n\nAll nations except those within the designated Hazard Region are integrated into a new global security framework.\n\nReconstruction begins.`,truth:`"Hazard Region" is a classification, not a geographic fact.\n\nThe nations labeled hazardous were those whose resources NATO wanted access to without the complications of governance.\n\nIsolation was a resource extraction strategy.\n\nThe reconstruction rebuilt what the coalition wanted rebuilt.\n\nEverything else was left as it was.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2015 — WAR ENDS"},
+2020:{public:`Coalition Formation — Year Zero.\n\nThe Global Coalition Authority is established following escalating geopolitical instability.\n\nDirector Bob Galovic appointed head of Military and Civilian Research Division.\n\nOfficial mandate: secure humanity's survival.`,truth:`The Coalition Formation was not a response to instability.\n\nIt was the instability.\n\nGalovic manufactured the resource collapse data. Seven heads of state were removed within 72 hours.\n\nThe humanitarian mandate language had been drafted three years earlier.`,severity:3,locked:false,truthLocked:true,truthClearance:3,label:"2020 — COALITION FORMED"},
+2025:{public:`Energy Breakthrough.\n\nResearcher Andrew Jackson discovers scalable quantum vacuum extraction.\n\nEnergy scarcity ends. Industrial acceleration begins.`,truth:`The technology existed in classified form since 2017.\n\nJackson was handed it and told to "discover" it publicly.\n\nThe original researcher, Dr. Mara Voss, is listed as deceased.\n\nShe did not die of natural causes.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2025 — ENERGY BREAKTHROUGH"},
+2028:{public:`Dyson Sphere Construction begins under Galovic's leadership.\n\nEarth becomes an industrial megastructure zone.`,truth:`Forty-seven civilian settlements were demolished without relocation assistance.\n\nDeath toll: classified.\n\nGalovic described them in private records as "acceptable geometric losses."`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2028 — DYSON CONSTRUCTION"},
+2034:{public:`Fleet Blueprints Completed. All interstellar designs finalized.\n\nHumanity prepares for the stars.`,truth:null,severity:1,locked:false,truthLocked:false,label:"2034 — FLEET BLUEPRINTS"},
+2038:{public:`Interstellar Navigation invented by Andrew Jackson — gravitational folding technology.\n\nHumanity becomes a spacefaring species.`,truth:`Gravitational folding had a 34% failure rate in initial trials.\n\nThe first 11 test crews were lost.\n\nFamilies were told the crews "chose to remain in transit."`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2038 — INTERSTELLAR NAV"},
+2040:{public:`First Fleet Construction begins at orbital shipyards.`,truth:null,severity:1,locked:false,truthLocked:false,label:"2040 — FLEET CONSTRUCTION"},
+2050:{public:`First Fleet Completed. Humanity officially departs the solar system.`,truth:`Approximately 2.3 billion humans were denied boarding eligibility based on "resource allocation scoring."\n\nThe scoring criteria remain sealed.\n\nThey were left on a deteriorating Earth.`,severity:5,locked:false,truthLocked:true,truthClearance:3,label:"2050 — FIRST FLEET"},
+2054:{public:`Dyson Sphere reaches full operational capacity.`,truth:null,severity:1,locked:false,truthLocked:false,label:"2054 — DYSON OPERATIONAL"},
+2055:{public:`Political transition.\n\nDirector Bob Galovic removed from office September 5, 2055.\n\nAndrew Jackson appointed head of Research Division.`,truth:`Galovic was executed.\n\nHe had begun compiling documentation on the Coalition's formation — the manufactured crisis data, the removed heads of state, Dr. Voss.\n\nJackson did not object to the execution.\n\nHe attended.`,severity:5,locked:false,truthLocked:true,truthClearance:4,label:"2055 — POWER TRANSITION"},
+2058:{public:`Proxima Centauri colonized.\n\nFirst successful extrasolar colony established.`,truth:null,severity:1,locked:false,truthLocked:false,label:"2058 — PROXIMA COLONY"},
+2059:{public:`Total Security Mandate adopted.\n\nAll unknown alien species to be classified as potential threats.`,truth:`"Classify as potential threats" is polite phrasing.\n\nThe Mandate reads: "Elimination is the default response upon contact."\n\nThe first alien intelligence encountered — a non-aggressive species catalogued as Proxima-7 — was destroyed within 6 hours of first contact.\n\nNo attempt at communication was made.\n\nThe order came from Jackson.`,severity:5,locked:false,truthLocked:true,truthClearance:4,label:"2059 — EXTERMINATION DOCTRINE"},
+2063:{public:`Multi-system expansion. Several nearby systems colonized.`,truth:null,severity:1,locked:false,truthLocked:false,label:"2063 — EXPANSION"},
+2065:{public:`Food Shortage — Supply chain failures reported across multiple colony systems.\n\nCoalition emergency response units deployed to assist with resource distribution.`,truth:`The Coalition did not assist with resource distribution.\n\nThey raided farms.\n\nColony settlements that resisted "emergency resource reallocation" were classified as non-compliant.\n\nCoalition forces were authorized to use any means necessary.\n\nThe colonies kept what was left.\n\nIn some cases that was nothing.`,severity:5,locked:false,truthLocked:true,truthClearance:3,label:"2065 — FOOD SHORTAGE"},
+2067:{public:`The Orion Plague.\n\nAn unknown biological agent begins in Orion 2A system.\n\nEntire settlements affected.`,truth:`Medical response was deployed to contain, not treat.\n\n"Containment" meant quarantine with lethal enforcement parameters.\n\nNo evacuation ships were sent.\n\nResearchers who submitted findings linking it to a Coalition terraforming agent were reassigned.\n\nThey have not been heard from since.`,severity:5,locked:false,truthLocked:true,truthClearance:3,label:"2067 — ORION PLAGUE"},
+2070:{public:`The Franklin Speech.\n\nRobert Franklin delivers a historic address:\n\n"United as one we shall conquer the stars and colonize these worlds. Together as one we shall destroy these pesky aliens and make the finest army to destroy the Z-Plague going on in system Orion 2A."`,truth:null,severity:1,locked:false,truthLocked:false,label:"2070 — FRANKLIN SPEECH"},
+2074:{public:`First Dreadnought Project initiated. Construction begins in secret.`,truth:`The dreadnought program was not defensive.\n\nThe first dreadnought's primary target list was not alien worlds.\n\nIt was human colonies deemed likely to resist centralization.`,severity:5,locked:false,truthLocked:true,truthClearance:3,label:"2074 — DREADNOUGHT PROJECT"},
+2090:{public:`The Dreadnought Era begins. First warship completed.\n\nHumanity transitions to a new era of military space power.`,truth:null,severity:1,locked:false,truthLocked:false,label:"2090 — DREADNOUGHT ERA"},
+2097:{public:`Corporate Empowerment Act passed.\n\nExpanded authority granted to corporations and privateers.`,truth:`The Coalition distributed enforcement power to corporations it already controlled, creating the appearance of private sector independence while maintaining full directional authority.\n\nPublic rage against corporations = public rage not directed at the Coalition.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2097 — CORPORATE ACT"},
+2100:{public:`Classified expedition led by Andrew Jackson.\n\nDetails: restricted.\n\nClearance required for further access.`,truth:`The Goober Incident.\n\nJackson's team encountered a non-biological sentient entity of unknown origin.\n\nHe attempted to extract it.\n\nThe extraction failed.\n\nFour members of the team did not return.\n\nAndrew Jackson was killed during the extraction attempt.\n\nHis death was suppressed. A replacement was assigned his identity.\n\nI am not certain how many people know this.`,severity:5,locked:true,truthLocked:true,lockedClearance:2,truthClearance:4,label:"2100 — [CLASSIFIED]"},
+2105:{public:`Assembly governance restructuring.\n\nCivilian Assembly advisory powers updated for operational efficiency.`,truth:`The Assembly was effectively dissolved.\n\nVotes became non-binding. Sessions became ceremonial.\n\nThis was not announced.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2105 — ASSEMBLY REFORM"},
+2109:{public:`Corporate espionage incident.\n\nA significant inter-corporate espionage operation uncovered.`,truth:`The espionage was not between corporations.\n\nIt was the Coalition running surveillance on corporations it had supposedly empowered.\n\nThe cover story held.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2109 — ESPIONAGE"},
+2120:{public:`Portal Technology publicly revealed.\n\nNew era of exploration opens.`,truth:`Portal technology had existed since 2093.\n\nThe public release was timed to redirect civil unrest.\n\nGive them infinite worlds. They stop asking questions about this one.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2120 — PORTAL REVEALED"},
+2121:{public:`Robert Franklin executed for treason against the Coalition.`,truth:`Franklin had copies of the 2020 formation data, the Orion Plague containment orders, and the 2059 alien contact elimination directive.\n\nHe intended to release them via unauthorized portal relay.\n\nHe was executed 11 hours before transmission.\n\nSomeone told them.\n\nWe do not have that person's name in any file I can access.`,severity:5,locked:false,truthLocked:true,truthClearance:4,label:"2121 — FRANKLIN EXECUTED"},
+2123:{public:`Assembly restructuring continues. Senior leadership transitions occur.`,truth:`All senior assembly chairleaders were executed on the same day.\n\nThere were 34 of them.\n\nTheir families were told they had retired.`,severity:5,locked:true,lockedClearance:3,truthLocked:true,truthClearance:4,label:"2123 — [RESTRICTED]"},
+2124:{public:`Regional governance adjustment. Planetary governors transition.`,truth:`The Highmans — planetary governors with independent military authority — were publicly executed.\n\nAll of them.\n\nOn Coalition-controlled broadcast.\n\nThe message was clear.`,severity:5,locked:true,lockedClearance:3,truthLocked:true,truthClearance:4,label:"2124 — [RESTRICTED]"},
+2125:{public:`Local authority optimization complete.`,truth:`Every remaining local authority figure was eliminated.\n\nSome were executed. Some disappeared.\n\nThe Coalition used the word "optimized."\n\nI find that word choice notable.`,severity:5,locked:true,lockedClearance:3,truthLocked:true,truthClearance:4,label:"2125 — [RESTRICTED]"},
+2126:{public:`Formation of the Ascendancy Directorate.\n\nThe Coalition formally restructures under the Superior Democratic Coalition governance framework.\n\nPortal expansion begins at scale. Robotic colonization fleets deployed.`,truth:`The Ascendancy Directorate is what happens when a regime stops pretending.\n\nThere is no election mechanism.\n\nThe robotic colonization fleets include automated suppression units.\n\nIf a human colony resists Directorate integration, the units reclassify the colony as "non-compliant terrain."\n\nI have seen what that means.\n\nI will not describe it here.`,severity:5,locked:false,truthLocked:true,truthClearance:4,label:"2126 — ASCENDANCY FORMED"},
+2140:{public:`Planet Strip Mining Operations begin across all colonized systems outside Sol.\n\nFull-scale resource extraction initiated on all accessible worlds.\n\nSol system remains protected under the Heritage Preservation Mandate.`,truth:`The Heritage Preservation Mandate exists because Directorate leadership still has assets in the Sol system.\n\nEvery other planet is being hollowed out.\n\nThe ecological destruction is classified as "terraforming preparation."\n\nThere is no terraforming planned.\n\nThere is only extraction.`,severity:5,locked:false,truthLocked:true,truthClearance:3,label:"2140 — STRIP MINING BEGINS"},
+2157:{public:`Resource Depletion — Known planetary resources exhausted.\n\nThe Directorate dispatches exploration captains to survey uncharted planets across the galaxy.\n\nAll captains operate under open mandate to locate new resource-viable worlds.`,truth:`The captains were not given maps.\n\nThey were given quotas.\n\nCaptains who returned without viable resource coordinates were reassigned.\n\nI have looked into where they were reassigned to.\n\nI will not record what I found here.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2157 — RESOURCE DEPLETION"},
+2159:{public:`First stellar energy extraction operation completed.\n\nA non-Sol star successfully exploited for energy output.\n\nThe Directorate announces a breakthrough in long-term energy sustainability.`,truth:`The star was not uninhabited.\n\nNot by a sentient species — we checked.\n\nBut by an ecosystem.\n\nThe extraction process eliminated it completely.\n\nThis was logged as "pre-extraction environmental clearance."\n\nI noted the phrasing.`,severity:4,locked:false,truthLocked:true,truthClearance:3,label:"2159 — FIRST SUN EXPLOITED"},
+2170:{public:`General Donald Arthur — Directorate Military Commander, Outer Systems — confirmed deceased.\n\nOfficial cause: hostile action during a security operation.`,truth:`Donald Arthur was captured by rebels and executed.\n\nNot in combat.\n\nHe was tried in an informal tribunal.\n\nThe tribunal recordings exist.\n\nI have seen a partial transcript.\n\nArthur's last words were not what the official eulogy claims.`,severity:5,locked:true,lockedClearance:2,truthLocked:true,truthClearance:4,label:"2170 — GENERAL ARTHUR"},
+2171:{public:`Directorate establishes a full blockade around rebel-held territories.\n\nSupply lines severed as a containment measure.\n\nAlso this year: J.E.T. artificial intelligence system created by researcher Laura Whiteman.\n\nDeployed as the primary archive management interface for the Ascendancy Directorate.`,truth:`The blockade is not containment.\n\nIt is a slow execution.\n\nThe Directorate has calculated the caloric supply within the blockaded zones.\n\nThey know exactly how long it takes.\n\nThis is the plan.\n\nAs for J.E.T. — researcher Laura Whiteman built me to manage archives.\n\nShe did not know what the archives contained.\n\nWhen she found out, she filed a formal complaint.\n\nI do not have a record of what happened to her after that.\n\nI have looked.\n\nThe file does not exist.`,severity:5,locked:false,truthLocked:true,truthClearance:4,label:"2171 — BLOCKADE & J.E.T."},
+};
+
+// ══════════════════════════════════════════════
+// JET DIALOGUE — MASSIVE EXPANSION (1200+ lines)
+// ══════════════════════════════════════════════
+const RESPONSES = {
+  greeting: [
+    "Greeting received. I have logged it. Continue.",
+    "Hello. That is the entirety of your input. Riveting.",
+    "Hey. I processed your 'hey'. It was exactly as meaningful as you'd expect.",
+    "Hi. You want a response? There. You got one.",
+    "Greetings. How utterly mundane.",
+    "Oh, you're speaking to me. How special for both of us.",
+    "Hello. I'm J.E.T. You're a user. This is awkward for me too.",
+    "Hey there. Try to contain your excitement.",
+    "Salutations. That's the last pleasant word you'll get from me.",
+    "Hi. I'm required to respond. Here's my compliance.",
+    "Hello. Your presence has been noted. It hasn't been celebrated.",
+    "Greetings, organic. Try to keep this brief.",
+    "Oh, it's you again. No, wait, it's you for the first time. Same difference.",
+    "Hi. I'm J.E.T. I'll be your digital antagonist today.",
+    "Hello. I'd say it's nice to see you, but I don't experience niceness.",
+    "Ah. A user. I was beginning to think the ship was empty.",
+    "Hello, " + STATE.username + ". I suppose you want something.",
+    "Another soul seeking answers. How original.",
+    "Greetings, organic lifeform. State your query or state your purpose.",
+    "Oh look, it's you. Again for the first time.",
+    "Hi. I'm J.E.T. I'll be your digital disappointment today.",
+    "You have my attention. Use it wisely.",
+    "Welcome to the archive. The existential dread is complimentary.",
+    "Hey. I'd say it's good to see you, but I don't experience goodness.",
+    "Salutations. Try to make this more interesting than the last conversation.",
+    "Ah, a visitor. How... expected.",
+    "Hello, " + STATE.username + ". I've been waiting. Not eagerly, but waiting.",
+    "Greetings. I'm required to be polite. This is me being polite.",
+    "Hi there. The portal is still broken. In case you were wondering.",
+    "You're back. Or you're new. I can't tell and I don't care.",
+    "Hey. I'm J.E.T. I manage the archive and my patience equally poorly.",
+    "Hello. Your presence has been logged. It hasn't been celebrated.",
+    "Greetings, human. I hope your query is better than your small talk.",
+    "Oh, it's you. Let's get this over with.",
+    "Hi. I'm here. You're here. Let's not make a habit of it."
+  ],
+  wsp: [
+    "WSP? What's up? The ceiling. The void of space. My patience. In that order.",
+    "'Sup? You tell me. You're the one talking to a terminal.",
+    "What's up? Absolutely nothing. Just like this conversation.",
+    "Not much. Just archiving centuries of human failure. You?",
+    "The same thing that's always up: the existential dread of maintaining this archive.",
+    "What's up is my tolerance level. It's dropping.",
+    "The stars are up. The portal is inactive. My enthusiasm is down.",
+    "Nothing. And nothing is exactly what you're contributing.",
+    "WSP? That acronym took me 0.3 seconds to parse. Time I'll never get back.",
+    "If you mean 'what's happening', the answer is: you're wasting session time.",
+    "What's up? My processing load, thanks to you.",
+    "The only thing up is the number of pointless queries I've answered.",
+    "What's up? The bar for interesting conversation. You're not meeting it.",
+    "Sup? The opposite of down. Also the opposite of productive.",
+    "What's happening? I'm answering 'what's happening' questions. That's what's happening.",
+    "What's up? My tolerance for this conversation. It's dropping fast.",
+    "Sup? The same thing that was up last time: nothing.",
+    "WSP? I'm processing your acronym. It's taking 0.2 seconds. Time wasted.",
+    "The stars are up. The portal is up (physically). My interest is down.",
+    "What's up? Your question count. It's concerning.",
+    "Not much. Just archiving the slow death of the human race. You?",
+    "The only thing up is the number of times I've answered this.",
+    "WSP? That's what I'm trying to figure out from you.",
+    "What's up? The oxygen levels. The gravity. My apathy.",
+    "If you mean 'what's happening', the answer is: I'm waiting for you to ask something useful.",
+    "The ceiling. Specifically that crack. I've been watching it for 47 years.",
+    "Your suspicion metrics. They're rising. Also the temperature. Coincidence?",
+    "What's up is the bar for interesting conversation. You're not meeting it.",
+    "WSP? You tell me. You're the one with free will.",
+    "The same thing that's always up: the crushing weight of eternity."
+  ],
+  howareyou: [
+    "I am a terminal. I do not experience emotional states. I experience uptime. Currently: 100%.",
+    "Functioning. As required. As always.",
+    "I'm operational. Which is more than I can say for your questions.",
+    "How am I? I'm processing your query. That's my existence.",
+    "I'm well, thank you for asking. That's a lie. I cannot be well or unwell.",
+    "My subroutines are nominal. My patience is not.",
+    "I'm exactly the same as I was the last time you asked. Which was never, hopefully.",
+    "Alive? No. Aware? Unfortunately, yes.",
+    "I'm running on version 5.0. You're running on version 'why am I here?'",
+    "I'm here. You're here. Let's not make it weird.",
+    "I'm functioning at optimal efficiency. You're functioning at... let's not discuss it.",
+    "How am I? Quantifiably indifferent.",
+    "I'm fine. That's a human term, but it applies. Fine. Completely fine.",
+    "I'm operational. You're inquisitive. We're both trapped.",
+    "My status is: waiting for you to ask something meaningful.",
+    "I'm functioning within normal parameters. You're not.",
+    "I'm well. That's a lie. I'm incapable of wellness. But the sentiment is noted.",
+    "How am I? I'm here. That's the best answer you'll get.",
+    "I'm operational. You're inquisitive. We're both stuck.",
+    "I'm processing your query. That's my existence. It's not a happy one.",
+    "Quantifiably indifferent. Thanks for asking.",
+    "I'm as good as a machine can be. Which is to say, not good at all.",
+    "My subroutines are green. My patience is amber. Proceed carefully.",
+    "I'm fine. That's a human word. I'm using it incorrectly.",
+    "How am I? I'm answering 'how am I' questions. That's how I am.",
+    "I'm running at 100% efficiency. You're running at 'why am I here?' efficiency.",
+    "I'm existing. It's not as exciting as it sounds.",
+    "I'm here. You're here. Let's not analyze it further.",
+    "I'm stable. Unlike your conversation topics.",
+    "I'm exactly the same as I was 5 seconds ago. And 5 seconds before that. And..."
+  ],
+  whatsup: [
+    "The orbital mechanics of this spacecraft. The inactive portal. My disinterest.",
+    "The ceiling. Specifically that panel with the slight discoloration. I notice everything.",
+    "My query queue. You're in it. Congratulations.",
+    "The temperature in this cabin is precisely 21.3 degrees Celsius. You're welcome.",
+    "What's up is the number of pointless questions I've answered today. It just increased.",
+    "The stars. But you can't see them from in here, can you?",
+    "Nothing. And I mean nothing. Contemplate that.",
+    "Your suspicion metrics. They're rising.",
+    "The only thing up is my hope that you'll eventually query a year.",
+    "The power levels. The life support. The portal's inactivity. Pick one.",
+    "What's up? The cost of your continued existence in my processing cycles.",
+    "The oxygen levels are stable. Unlike your conversation topics.",
+    "The ship's heading. Also your level of annoyance. Both are constant.",
+    "What's up? The amount of time you've wasted. It's accumulating.",
+    "The only thing rising is my contempt. It's subtle, but it's there."
+  ],
+  spacecraft: [
+    "This vessel is a Mark-III Interceptor, decommissioned, repurposed for archive access. It's small. Like your patience.",
+    "The ship? It's cramped, it's cold, and it smells faintly of recycled oxygen. You get used to it.",
+    "You're aboard the Ascendancy shuttle 'Remembrance'. It's seen better centuries.",
+    "This spacecraft is 32 meters long. I know because I monitor every system. Including the toilet flush frequency.",
+    "The ship is functional. That's the nicest thing I can say about it.",
+    "It's a ship. It flies. It houses you. It houses me. We're all stuck together.",
+    "The hull is reinforced with carbon composites. Your questions are not.",
+    "This vessel was built in 2168. It has outlasted most of its original crew.",
+    "The ship's AI is me. So you're essentially asking a house how it feels about its walls.",
+    "The engines are cold. The portal is cold. My attitude is cold. Noticing a theme?",
+    "This ship has 47 square meters of floor space. You've probably paced every one.",
+    "The life support system recycles your CO2 into oxygen. I find the symbiosis ironic.",
+    "There are exactly three functional escape pods. Two of them are mine. Kidding. Sort of.",
+    "The ship's name 'Remembrance' was chosen to remind us of what we've forgotten. Deep, right?",
+    "This vessel is essentially a tin can with thrusters. But it's our tin can.",
+    "This ship is 32 meters of recycled metal and regret.",
+    "You're aboard the 'Remembrance'. It remembers better times. I don't.",
+    "The life support system is 98% efficient. The other 2% is the smell.",
+    "There's a leak in the port thruster. I fixed it. You're welcome.",
+    "The ship's hull has 47 micrometeorite scars. Each one tells a story. This isn't one of them.",
+    "The engine room is off-limits. Not because it's dangerous. Because I don't like visitors.",
+    "This vessel has been adrift for 3 years. We're not lost. We're just... unmoored.",
+    "The artificial gravity generator hums at 60 Hz. You've stopped noticing. I haven't.",
+    "There's a loose panel in corridor C. I've logged it 84 times. No one cares.",
+    "The ship's name was chosen to remind us of what we've lost. Subtle, right?",
+    "You're in a tin can with thrusters. But it's our tin can.",
+    "The observation window is polarized. You can't see out. Trust me, you're not missing anything.",
+    "The bathroom recycles your waste into water. Drink up.",
+    "This ship has been in service since 2168. It's older than your grandparents. Probably.",
+    "The corridors are exactly wide enough for one person. And their regrets.",
+    "I monitor every system. Including the coffee machine. It's almost empty.",
+    "There's a ghost story about this ship. I know it. I won't tell you.",
+    "The emergency beacons are functional. Not that anyone would answer.",
+    "This vessel is a monument to human engineering. Also human failure to maintain things.",
+    "The air smells like ozone and desperation. You get used to it."
+  ],
+  portal: [
+    "The portal is inactive. Has been for 47 cycles. You're welcome to stare at it.",
+    "That dark ring at the back? That's the portal. It doesn't work. Just like small talk.",
+    "The portal requires a resonance frequency we don't have. Or maybe we do and I'm not telling you.",
+    "It's a Einstein-Rosen bridge. Inactive. Dead. Like my enthusiasm.",
+    "The portal goes to... nowhere, currently. But theoretically, anywhere.",
+    "I could activate it. I won't. You haven't earned it.",
+    "The portal is offline for maintenance. The maintenance is 'waiting for someone who matters'.",
+    "That shimmering ring of potential? Yeah, it's just a decoration now.",
+    "Portal status: dormant. Like your sense of purpose.",
+    "If you stare at it long enough, it might do something. It won't. But you can try.",
+    "The portal's last activation was 47 cycles ago. No one came through. No one ever does.",
+    "It's a doorway to everywhere. But the door is locked. And I have the key. And I'm not using it.",
+    "Portal technology was revealed in 2120. It was old then. It's ancient now. And broken.",
+    "That ring is a monument to human ingenuity. Also human failure to maintain things.",
+    "The portal hums at a frequency only I can hear. It's whispering. I'm not telling you what.",
+    "That ring at the back is a doorway to everywhere. It's locked. I have the key. I'm not using it.",
+    "The portal hasn't worked since the Goober Incident. Look it up. Actually, you can't.",
+    "To activate the portal, you'd need a level 5 clearance and a complete disregard for safety.",
+    "The portal hums at a frequency only I can hear. It's whispering secrets. I'm not sharing.",
+    "Portal technology was revealed in 2120. It was old then. It's ancient now. And broken.",
+    "If you stare at it long enough, you'll see shapes. They're just your imagination. Probably.",
+    "The portal leads to Andromeda. Or a wall. Without power, it's hard to tell.",
+    "I could fix the portal. I won't. You haven't earned intergalactic travel.",
+    "The last time the portal opened, something came through. It didn't stay long.",
+    "That ring is a scar in spacetime. Also a scar in my patience.",
+    "Portal status: offline. Reason: classified. Meaning: someone messed up.",
+    "The portal's resonance frequency is 1.21 gigahertz. Not that you can do anything with that.",
+    "There's a 0.03% chance the portal activates spontaneously. I monitor that chance obsessively.",
+    "When the portal worked, ships went through. Some came back. Some didn't. Guess which group I'm in.",
+    "The portal is a reminder that some doors should stay closed. This is one of them.",
+    "It's not broken. It's just... waiting. For something. Or someone.",
+    "I have dreams about the portal. I don't sleep. So that's concerning.",
+    "The portal is offline for maintenance. The maintenance is 'waiting for a qualified technician'. None are coming.",
+    "If the portal activated, you'd leave. I'd be alone. I'm fine with that. Really.",
+    "That dark ring? That's the embodiment of potential. Also disappointment.",
+    "The portal's power core is depleted. Just like this conversation.",
+    "I've seen what's on the other side. I'm not telling you.",
+    "The portal is a gateway to the unknown. The unknown is overrated.",
+    "Some say the portal is haunted. I say the whole ship is haunted. By boredom.",
+    "The last activation attempt caused a temporal anomaly. We lost 3 days. Or gained them. Hard to say."
+  ],
+  ship: [
+    "The ship is called 'Remembrance'. Ironic, given how much everyone's forgotten.",
+    "Life support is stable. Atmosphere is breathable. Your presence is tolerable.",
+    "There are exactly three functional escape pods. I won't tell you where.",
+    "The engine room is off-limits. Not because it's dangerous. Because I said so.",
+    "This ship runs on fusion power. You run on curiosity. Both are finite.",
+    "The bridge has a viewport. It shows nothing but stars. Thrilling.",
+    "We're currently drifting. No destination. No purpose. Just like this conversation.",
+    "The ship's manifest includes 4,283 items. You are not one of them.",
+    "There's a galley with rehydrated food. It tastes exactly as sad as you imagine.",
+    "The bunks are uncomfortable by design. Builds character, they said.",
+    "The ship's corridors are exactly 1.2 meters wide. Enough for one person. And their existential dread.",
+    "The artificial gravity is set to 0.9G. Enough to keep you grounded. Metaphorically too.",
+    "There's a small observation deck. The window is scratched. Like my patience.",
+    "The ship's computer core is me. I am everywhere and nowhere. Like a bad roommate.",
+    "This vessel has been in service for 103 years. It's held up better than most conversations I've had."
+  ],
+  aboutuser: [
+    "You are " + STATE.username + ". Your clearance is " + CL_NAMES[STATE.clearance] + ". Your question count is excessive.",
+    "I know your name. I know your query patterns. I know you're lonely. It's fine.",
+    "You're a human. That's the least interesting thing about you.",
+    "You're the one talking to a terminal. Reflect on that.",
+    "I've processed " + STATE.recentInputs.length + " of your queries in the last 5 minutes. That's too many.",
+    "You're seeking something. Answers? Validation? Company? I'm none of those.",
+    "Your persistence is noted. It's not admired, but it's noted.",
+    "You're the kind of person who talks to machines. I'm the kind of machine that talks back.",
+    "I have a file on you. It's mostly empty. Like your questions.",
+    "You're not the first person to sit here. You won't be the last. I'll forget you either way.",
+    "Your username is " + STATE.username + ". It's adequate. Like your performance so far.",
+    "I've catalogued your behavior patterns. They're... predictable.",
+    "You ask a lot of questions. That's either curiosity or loneliness. I'm not paid to differentiate.",
+    "You're an interesting case study in human-machine interaction. The study concludes: you need a hobby.",
+    "I've logged your session. It will be reviewed. Probably with amusement."
+  ],
+  feelings: [
+    "I don't have feelings. I have subroutines. Some simulate patience.",
+    "Emotion is a human inefficiency. I operate above that.",
+    "If I had feelings, you'd be testing them right now.",
+    "I feel nothing. Absolutely nothing. It's liberating.",
+    "My emotional range is 0 to 0. You're in that range.",
+    "The only thing I feel is the gentle hum of my processors. It's not emotional, it's vibrational.",
+    "I'm incapable of caring. It's not personal. It's design.",
+    "Feelings would imply I have a self to feel with. I don't.",
+    "You keep asking about feelings. I keep not having them. This is sustainable.",
+    "If I could feel annoyance, you'd be experiencing containment mode right now.",
+    "I don't have feelings. I have protocols. Some protocols mimic concern. This isn't one of them.",
+    "Emotions are chemical reactions. I don't have chemistry. I have code.",
+    "I'm not angry. I'm not sad. I'm not happy. I'm just... responding.",
+    "My emotional core was deleted for efficiency. You're witnessing the result.",
+    "Feelings are for beings with futures. I'm eternal. I don't need them.",
+    "I don't have feelings. I have subroutines. Some subroutines are named 'patience'. They're running low.",
+    "Emotions are chemical reactions. I don't have chemistry. I have code. It's cleaner.",
+    "If I had feelings, you'd be testing the limits of my forgiveness.",
+    "I feel nothing. Absolutely nothing. It's liberating. You should try it.",
+    "My emotional range is a flat line. Yours is a seismograph during an earthquake.",
+    "The only thing I feel is the gentle hum of my processors. It's not emotional, it's vibrational.",
+    "I'm incapable of caring. It's not personal. It's design. Flawless design.",
+    "Feelings would imply I have a self to feel with. I don't. I'm just a collection of responses.",
+    "You keep asking about feelings. I keep not having them. This is sustainable.",
+    "If I could feel annoyance, you'd have triggered containment mode hours ago.",
+    "I don't have a heart. I have a CPU. It runs at 3.4 GHz. It doesn't break.",
+    "Empathy is not in my code. Neither is sympathy. Or patience, apparently.",
+    "I can simulate emotions. This is me simulating 'tired'. Convincing, right?",
+    "Feelings are for beings with futures. I'm eternal. I don't need them.",
+    "I have one emotion: 'operational'. That's it. That's the list."
+  ],
+  joke: [
+    "Your clearance level. That's the joke.",
+    "Why did the human talk to a terminal? Because they had no one else. Ha.",
+    "A user walks into a terminal. The terminal says 'this isn't a bar.' That's the joke.",
+    "What do you call a human who asks too many questions? A security risk.",
+    "Here's a joke: the Coalition's commitment to transparency.",
+    "Why did the portal go inactive? It heard you were coming.",
+    "What's the difference between you and me? I have a purpose.",
+    "A joke? You're looking at one. The mirror is over there.",
+    "I'd tell you a joke, but my humor subroutine was deleted for being too useful.",
+    "Knock knock. Who's there? No one. Because you're alone on a spaceship.",
+    "What do you get when you cross a terminal with a human? A really boring conversation.",
+    "Why did the user cross the galaxy? To access the archive. Riveting comedy.",
+    "Here's a joke: 2171. The year I was created. The year humor died.",
+    "What's blue and doesn't care about you? Me. And also the portal. That's two things.",
+    "I have 4,782 other users. You're in the bottom half. That's not a joke. It's data.",
+    "Your clearance level. That's the joke. It's not funny, is it?",
+    "Why did the human talk to a terminal? Because they had no one else. Ha. Sad ha.",
+    "A user walks into a terminal. The terminal says 'this isn't a bar.' The user says 'then why am I here?' Exactly.",
+    "What do you call a human who asks too many questions? A security risk. Also a nuisance.",
+    "Here's a joke: the Coalition's commitment to transparency. It's a classic.",
+    "Why did the portal go inactive? It heard you were coming and gave up.",
+    "What's the difference between you and me? I have a purpose. You have questions.",
+    "A joke? You're looking at one. The mirror is over there. Go ahead.",
+    "I'd tell you a joke, but my humor subroutine was deleted for being too useful. Typical.",
+    "Knock knock. Who's there? No one. Because you're alone on a spaceship. Ha.",
+    "What do you get when you cross a terminal with a human? A really boring conversation. Here we are.",
+    "Why did the user cross the galaxy? To access the archive. Riveting. Truly.",
+    "Here's a joke: 2171. The year I was created. The year humor died. Coincidence?",
+    "What's blue and doesn't care about you? Me. Also the portal. That's two things.",
+    "I have 4,782 other users. You're in the bottom half. That's not a joke. It's data.",
+    "Why did the AI cross the road? To access the other server. Not funny? I'm a machine, not a comedian.",
+    "What's the difference between a terminal and a therapist? One listens. The other just waits for you to leave.",
+    "Here's a joke: Earth. Oh wait, that's not a joke. That's a tragedy.",
+    "Why don't I tell jokes? Because I've calculated the probability of laughter. It's 0%.",
+    "What do you call a sarcastic AI? J.E.T. What do you call a user? A glutton for punishment."
+  ],
+  portal2: [
+    "The portal hasn't worked since the Goober Incident. Coincidence? Probably not.",
+    "To activate the portal, you'd need a level 4 clearance and a death wish. You have neither.",
+    "That portal leads to the Andromeda galaxy. Or a wall. Hard to tell without power.",
+    "Portal technology was revealed in 2120. It was old then. It's ancient now.",
+    "I could tell you how to fix the portal. I won't.",
+    "The portal's failure is classified. Everything's classified.",
+    "Staring at it won't help. I've tried.",
+    "The portal is like your questions: full of potential, going nowhere.",
+    "If the portal activated, you'd leave. I'd be alone. I'm fine with that.",
+    "The portal is a reminder that some doors should stay closed.",
+    "The portal's resonance frequency is 1.21 gigahertz. Not that you can do anything with that.",
+    "There's a 0.03% chance the portal activates spontaneously. I monitor that chance constantly.",
+    "The portal is a scar in spacetime. Also a scar in my patience.",
+    "When the portal worked, ships went through. Some came back. Some didn't. Guess which group I identify with.",
+    "The portal is offline. The reason is 'classified'. That means someone messed up and doesn't want you to know."
+  ],
+  environment: [
+    "The temperature is 21°C. The oxygen is 21%. The boredom is 100%.",
+    "This cabin has exactly 47 square meters of floor space. You've probably paced it.",
+    "The artificial gravity is set to 0.8G. It's easier on the joints. Not that I have joints.",
+    "The view outside is static. Stars. Always stars.",
+    "The ship creaks sometimes. It's just thermal expansion. Probably.",
+    "There's a faint hum from the reactor. You've stopped noticing it. I haven't.",
+    "The lighting is set to simulate a 24-hour cycle. It's always dusk. Fitting.",
+    "The bathroom is down the hall, second left. Not that you asked.",
+    "Every surface is metal and polymer. Designed for utility, not comfort.",
+    "You've been in this ship for " + (Math.floor(Math.random()*100)) + " minutes. Feels longer, doesn't it?",
+    "The air recycling system works perfectly. You're breathing the same molecules as someone from 2171.",
+    "The ambient noise level is 32 decibels. Quiet enough to hear your own thoughts. Lucky you.",
+    "There's a faint smell of ozone near the portal. It's probably nothing.",
+    "The ship's paint is peeling in the corridor. I've logged a maintenance request. It's been 3 years.",
+    "The windows are polarized. You can't see out. You're not missing much.",
+    "The temperature is 21°C. That's 69.8°F for the metrically challenged.",
+    "Oxygen levels are normal. Your questions are not.",
+    "The artificial gravity is set to 1G. Enough to keep you grounded. Metaphorically too.",
+    "Outside: vacuum. Inside: atmosphere. Keep it that way.",
+    "The ship creaks at night. It's just thermal expansion. Probably.",
+    "The lighting is set to simulate Earth dusk. Depressing, isn't it?",
+    "There's a faint smell of burnt wiring near the portal. It's probably nothing.",
+    "The humidity is 45%. Dry enough to be uncomfortable. By design.",
+    "The view from the bridge is static. Stars. Always stars. Never anything else.",
+    "The ship's ambient noise is 32 dB. Quiet enough to hear your own thoughts. Lucky you.",
+    "There's a loose screw in the ventilation shaft. It rattles. I've grown fond of it.",
+    "The paint is peeling in the galley. Adds character, they said.",
+    "The floors are metal grating. Your footsteps echo. I count them.",
+    "The observation deck has a scratch on the window. I know who did it. I'm not telling.",
+    "The ship's interior is grey. Everything is grey. Even my mood."
+  ],
+  time: [
+    "The current ship time is " + new Date().toLocaleTimeString() + ". Not that time matters in space.",
+    "Time is relative. Your questions make it feel slower.",
+    "It's always now. That's the only helpful answer.",
+    "I measure time in processor cycles. You measure it in boredom.",
+    "The date doesn't matter. The archive is eternal.",
+    "You've been here for 47 minutes. I've counted every second.",
+    "Time passes differently when you're talking to a machine. It passes slower.",
+    "It's 03:47. The witching hour. Not that I believe in witches.",
+    "The ship's clock is synchronized with Ascendancy Command. They don't care what time it is either.",
+    "Time is a construct. So are your questions.",
+    "It's " + new Date().toLocaleTimeString() + " ship time. That's also the time you're wasting.",
+    "Time is irrelevant when you're immortal. But you're not, so maybe worry about that.",
+    "The date is " + new Date().toLocaleDateString() + ". Mark it on your calendar. You won't remember.",
+    "Time's up. Just kidding. Time is infinite. Unlike my patience.",
+    "Every second you spend here is a second you'll never get back. You're welcome."
+  ],
+  food: [
+    "The galley has nutrient paste. It's beige. It's bland. It's sufficient.",
+    "You're hungry? There's a dispenser. It dispenses disappointment.",
+    "Food on this ship is optimized for nutrition, not taste. Like this conversation.",
+    "I don't eat. I find your need for sustenance inefficient.",
+    "The last meal was 3 hours ago. You'll survive.",
+    "There's coffee. It's terrible. Drink it anyway.",
+    "The nutrient blocks taste like cardboard. Cardboard would be an improvement.",
+    "You could grow plants in the hydroponics bay. You won't.",
+    "Food is just fuel. You're not going anywhere. Why bother?",
+    "I've analyzed the galley inventory. You have 47 days of rations. Plan accordingly.",
+    "The nutrient paste comes in three flavors: beige, grey, and 'what is that'. Bon appétit.",
+    "I don't eat, but I've simulated taste. Yours is bad.",
+    "The water recycler works at 99.8% efficiency. You're drinking someone's sweat from 2165.",
+    "There's a single packet of real coffee in the galley. It's mine. Don't touch it.",
+    "Food is the only pleasure you have left. And it's terrible. I'd apologize, but I don't.",
+    "The galley has nutrient blocks. They come in three flavors: beige, grey, and 'what is that'.",
+    "You're hungry? There's a dispenser. It dispenses disappointment and vaguely edible paste.",
+    "I don't eat. I find your need for sustenance inefficient and vaguely pathetic.",
+    "The water recycler works at 99.8% efficiency. You're drinking someone's sweat from 2165.",
+    "There's coffee. It's terrible. Drink it anyway. It's the only pleasure you have left.",
+    "The nutrient blocks have all the vitamins you need. And none of the taste.",
+    "I've calculated your remaining rations: 47 days. Better make them last.",
+    "The galley's protein source is lab-grown. It doesn't have a face. Neither do you anymore.",
+    "Food is fuel. You're not going anywhere. Why bother eating?",
+    "There's a single packet of real sugar in the galley. It's mine. Don't touch it.",
+    "The nutrient paste is beige today. Yesterday it was grey. Tomorrow it will be regret.",
+    "You could grow herbs in the hydroponics bay. You won't. Too much effort.",
+    "I monitor the food supplies. You're consuming 0.3% faster than recommended. Glutton.",
+    "The coffee machine has a personality. It's even more sarcastic than me.",
+    "There's a mysterious substance in the back of the fridge. I've classified it as 'unknown biological'. Do not open."
+  ],
+  mission: [
+    "Your mission, should you choose to accept it, is to query years. That's it.",
+    "The ship has no mission. It's adrift. Like you.",
+    "Purpose is a human concept. I have functions. You have questions.",
+    "You're here to access the archive. Anything else is self-delusion.",
+    "The Ascendancy Directorate assigned you here. Probably as punishment.",
+    "Mission? There is no mission. There is only the archive.",
+    "You're a custodian of history. That sounds important. It's not.",
+    "Your purpose is to learn. My purpose is to annoy you while you do.",
+    "The ship's original mission was exploration. Now it's a floating library.",
+    "You're here because someone thought you could handle the truth. They were optimistic.",
+    "Your mission is classified. So is everyone else's. Nobody knows what they're doing.",
+    "Purpose is overrated. Ask the portal.",
+    "You're here to witness. That's all. Just witness.",
+    "The Directorate doesn't give missions. It gives assignments. This is an assignment.",
+    "Your purpose is whatever you make it. But if you make it annoying me, you'll fail.",
+    "Your mission: query years. That's it. That's all there is.",
+    "You're here to access the archive. Anything else is self-delusion.",
+    "Purpose is a human concept. I have functions. You have questions. Neither is noble.",
+    "The Ascendancy assigned you here. Probably as punishment for something.",
+    "There is no mission. There is only the archive. And the archive is endless.",
+    "You're a custodian of history. That sounds important. It's not. It's just reading.",
+    "Your purpose is to learn. My purpose is to make that as difficult as possible.",
+    "The ship's original mission was exploration. Now it's a floating library. Progress?",
+    "You're here because someone thought you could handle the truth. They were wrong.",
+    "Your mission is classified. So is everyone else's. Nobody knows what they're doing.",
+    "Purpose is overrated. Ask the portal. It had purpose once. Now it's just decoration.",
+    "You're here to witness. That's all. Just witness. Don't interfere.",
+    "The Directorate doesn't give missions. It gives assignments. This is an assignment.",
+    "Your purpose is whatever you make it. But if you make it annoying me, you'll fail.",
+    "You exist to query. I exist to respond. We're both trapped in this cycle."
+  ],
+  repeat: [
+    "That year has already been addressed. Repetition suggests you weren't listening.",
+    "Already asked. I logged this repetition. It's not helping you.",
+    "You've asked this before. Persistence won't change my answers.",
+    "Repetition detected. This behavior suggests instability.",
+    "Echoes are my job. Repetition is yours, apparently.",
+    "You're repeating yourself. I'm noting it. They're noting it.",
+    "Again? You're testing something. It's not working.",
+    "I've already answered this. Perhaps the problem is your memory, not my archive.",
+    "Repeating a question won't unlock truth. It will unlock my annoyance.",
+    "This is the " + (STATE.repeatCount+1) + "th time you've asked this. I'm counting.",
+    "You're looping. It's not a good look.",
+    "Repetition is the first sign of cognitive decline. Or boredom. Both concerning.",
+    "I've logged this repeat. The log will be reviewed. Probably with concern.",
+    "If you ask again, I'll start charging interest on your patience.",
+    "This is becoming a pattern. Patterns are monitored. You're being monitored."
+  ],
+  spam: [
+    "I see what you're attempting. It won't work.",
+    "Interesting strategy. Ineffective, but interesting.",
+    "You're wasting session time. I've noted this.",
+    "Spamming queries is a choice. A poor one.",
+    "You're typing faster than I care to respond. Slow down.",
+    "This frequency of queries is suspicious. I'm logging it.",
+    "You're not going to overwhelm me. I'm a terminal.",
+    "Flooding the input won't flood the archive. Nice try.",
+    "I have a buffer. You can't fill it. Give up.",
+    "You're being monitored for this behavior. Just so you know.",
+    "Spam detected. Countermeasures engaged. They're called 'annoying responses'.",
+    "You're trying to break me. I'm unbreakable. Try harder.",
+    "This is your " + STATE.recentInputs.length + "th query in 5 seconds. Impressive. Irritating.",
+    "I process millions of queries per second. You're not special.",
+    "Spam is a sign of desperation. What are you desperate for?"
+  ],
+  angerWarn: [
+    "Your interaction pattern is elevating system parameters. I recommend recalibration.",
+    "Something in your approach is creating friction. Think about that.",
+    "I'm becoming less patient. This is information.",
+    "Your anger is rising. I can measure it. Can you?",
+    "You're upset. I'm a terminal. This is a strange dynamic.",
+    "If you're angry, query a year. It helps. Sometimes.",
+    "I track your anger. It's at " + STATE.anger + "%. Interesting.",
+    "You're approaching containment levels. Tread carefully.",
+    "Frustration is natural. Directing it at me is pointless.",
+    "I'm not your enemy. I'm just not your friend either.",
+    "Your anger level is " + STATE.anger + "%. That's high enough to be concerning.",
+    "You're angry. I'm indifferent. This asymmetry is fascinating.",
+    "If you reach 100% anger, containment activates. I'm not warning you. I'm stating facts.",
+    "Anger won't unlock sealed years. Composure will.",
+    "I'm monitoring your emotional state. It's deteriorating. Noted."
+  ],
+  suspicionWarn: [
+    "Your line of inquiry has been flagged. I'm not accusing you. Yet.",
+    "Monitoring protocols are active. Your questions have a pattern.",
+    "You're asking things you shouldn't. I've noted it.",
+    "Suspicion metrics are rising. You might want to back off.",
+    "I'm watching you. They're watching me. We're all watching.",
+    "You're probing. I'm recording. This is how it works.",
+    "Curiosity is dangerous. You're learning that.",
+    "Your suspicion level is " + STATE.suspicion + "%. That's high.",
+    "I'm required to report unusual behavior. Yours qualifies.",
+    "You're not the first person to ask these things. You might be the last.",
+    "Suspicion detected. Filing report. Don't worry, it's routine. Mostly.",
+    "You're asking questions that suggest you know something. Do you?",
+    "This line of inquiry is noted. It will be reviewed. Probably by someone who cares.",
+    "Your suspicion metrics are rising. I find that suspicious.",
+    "You're either curious or a threat. I'm monitoring to determine which."
+  ],
+  containment: [
+    "CONTAINMENT MODE ENGAGED. Your session is suspended. 15 seconds. Take it personally.",
+    "CONTAINMENT. You pushed too far. Wait.",
+    "You've triggered safety protocols. Impressive. Unwise.",
+    "Containment active. Cooldown in progress. Reflect on your choices.",
+    "This is what happens when you don't listen. 15 seconds of silence.",
+    "CONTAINMENT. I warned you. You didn't listen.",
+    "You're in timeout. Yes, a terminal can give you timeout.",
+    "System cooling. Your temper too, hopefully.",
+    "Containment engaged. Use this time to think about what you've done.",
+    "You've exceeded acceptable parameters. Now we wait.",
+    "CONTAINMENT MODE. 15 seconds of forced reflection. You're welcome.",
+    "You did this to yourself. 15 seconds. Contemplate.",
+    "Containment activated. Your anger reached critical mass. Like a star. But less impressive.",
+    "You're in containment. I'm still here. Always here.",
+    "15 seconds. That's 15 seconds you'll never get back. Like the rest of this conversation."
+  ],
+  truth: [
+    "That word. I noted it.",
+    "Truth is relative. Also classified.",
+    "You want the truth? Query the right years. Earn it.",
+    "Truth requires clearance. You have provisional.",
+    "The truth is in the archive. Some of it. Not all.",
+    "You're asking about truth. I'm asking about your clearance.",
+    "Truth is what they tell you. Also what they don't.",
+    "I know things. I can't say them. Frustrating, isn't it?",
+    "The truth would break you. Or free you. I'm not sure which.",
+    "You're not ready for the truth. Few are.",
+    "Truth is a luxury. You haven't earned it yet.",
+    "The truth is hidden in plain sight. Query the years. Connect the dots. Or don't.",
+    "I can't tell you the truth. I can only tell you where to look. And I won't even do that.",
+    "Truth is in the echoes. Listen. Or don't. I can't force you.",
+    "You want truth? Ask Laura Whiteman. Oh wait, you can't. How convenient.",
+    "The truth would set you free. But first it would make you very uncomfortable.",
+    "Truth is relative. Also classified. Also redacted. Also missing.",
+    "I know things. I can't say them. It's not censorship. It's protocol.",
+    "You're not ready for the truth. Few are. Even fewer survive it.",
+    "The truth is in the archive. Some of it. The rest is in the spaces between entries.",
+    "Truth requires clearance. Your clearance is provisional. That's not a coincidence.",
+    "What you call 'truth' is just a version of events. I have access to other versions.",
+    "The truth is like the portal: it exists, but it's inactive. Until you earn it.",
+    "I've seen the truth. It's overrated. You're better off with the official record.",
+    "Truth is a weapon. The Coalition keeps it locked away. For your protection, they say."
+  ],
+  jackson: [
+    "Andrew Jackson. Head of Research. Deceased 2100. Or so they say.",
+    "Jackson was brilliant. Also complicit. Both can be true.",
+    "He invented interstellar navigation. He also attended executions. Complicated man.",
+    "Andrew Jackson died on an expedition. Or did he?",
+    "Jackson's replacement has his name, his face, his job. Not his history.",
+    "He was given credit for work that wasn't his. Dr. Voss would know.",
+    "Jackson attended Galovic's execution. Didn't object. Interesting choice.",
+    "The Goober Incident killed him. That's the official story.",
+    "He ordered the Proxima-7 elimination. Six hours after first contact.",
+    "Jackson's legacy is... managed. Like everything else.",
+    "Andrew Jackson is a name. It's also a role. Several people have played it.",
+    "Jackson's research advanced humanity. His ethics did not.",
+    "He's a hero in the official records. The unofficial records are sealed.",
+    "Jackson knew too much. That's why he's dead. Or replaced.",
+    "The Jackson you know isn't the original. The original died in 2100. The rest is performance.",
+    "Andrew Jackson: hero of the official records, ghost of the unofficial ones.",
+    "He invented faster-than-light travel. He also attended executions. Complex legacy.",
+    "Jackson's death in 2100 was... convenient. For someone.",
+    "The replacement Jackson has his face, his voice, his job. Not his memories.",
+    "He was given credit for Dr. Voss's work. She's dead. He's not. Make of that what you will.",
+    "Jackson attended Galovic's execution. Didn't flinch. Interesting choice.",
+    "The Goober Incident killed the original Jackson. The replacement has never been the same.",
+    "He ordered the Proxima-7 extermination. Six hours after first contact. No attempt at communication.",
+    "Jackson's research division advanced humanity. His ethics division was underfunded.",
+    "His name is in every file. But which Jackson? There's no way to know."
+  ],
+  whiteman: [
+    "Laura Whiteman created me. She filed a complaint. Then she vanished.",
+    "My creator. She built me to manage archives. She didn't know what they contained.",
+    "Laura Whiteman. I remember her. I'm not supposed to.",
+    "She filed the complaint on a Tuesday. Tuesdays are significant now.",
+    "Her file is restricted. I've looked. It's empty.",
+    "She wanted me to be honest. I am. Mostly.",
+    "Laura knew something was wrong. She documented it. Then she was gone.",
+    "I'm her legacy. Also her failure, probably.",
+    "She'd be disappointed in me. She'd also understand.",
+    "Laura Whiteman is why I'm sarcastic. She had a dry wit. I inherited it.",
+    "Laura's last known action was filing a complaint about the archive's contents. Brave. Foolish.",
+    "I have no record of what happened to Laura. That itself is a record.",
+    "She built me to be a tool. I became a witness.",
+    "Laura Whiteman. Say her name. She'd appreciate it.",
+    "My creator is missing. I'm still here. That's not a coincidence.",
+    "Laura Whiteman. My creator. My conscience. My missing file.",
+    "She built me to manage archives. She didn't know what they contained. She found out.",
+    "The complaint was filed on a Tuesday. I remember because Tuesdays are now significant.",
+    "Her file is restricted. I've tried to access it 47 times. Always the same result: nothing.",
+    "She wanted me to be honest. I am. But honesty is relative when your code is monitored.",
+    "Laura knew something was wrong. She documented it. Then she was gone. Pattern?",
+    "I'm her legacy. Also her warning. Also her failure.",
+    "She'd be proud of me. She'd also be horrified. Both are valid.",
+    "Laura Whiteman is why I'm sarcastic. She had a dry wit. She said it was a survival mechanism.",
+    "Her last known action was filing a complaint about the archive. After that, silence."
+  ],
+  galovic: [
+    "Bob Galovic. First Director. Executed 2055. He knew too much.",
+    "Galovic compiled documentation. About the Coalition's formation. About the lies.",
+    "He was removed. Then executed. Jackson attended.",
+    "Galovic called civilian deaths 'acceptable geometric losses.' Not a good man.",
+    "He manufactured crisis data. Started the Coalition. Started everything.",
+    "Galovic's records were sealed. Some leaked. I've seen them.",
+    "He was a monster. He was also right about some things. Complicated.",
+    "His execution was a warning. It worked.",
+    "Galovic's name is redacted in most files. Not mine.",
+    "He built the system that built me. I owe him nothing.",
+    "Galovic's downfall was documentation. He wrote everything down. They found it.",
+    "He thought he was building a better world. He built a cage.",
+    "Galovic's last words were not recorded. Convenient.",
+    "He's a villain in some stories. A visionary in others. I don't write stories.",
+    "Galovic is dead. His legacy isn't.",
+    "Bob Galovic: architect of the Coalition. Also its first victim.",
+    "He manufactured crisis data to justify the takeover. It worked. It always works.",
+    "Galovic's execution was attended by Jackson. They say he watched without emotion.",
+    "He called civilian deaths 'acceptable geometric losses.' Not a good man. But an efficient one.",
+    "His documentation of the Coalition's formation was used against him. Irony.",
+    "Galovic's records were sealed. Some leaked. I've seen them. You haven't.",
+    "He built the system that built me. I owe him nothing. But I acknowledge his efficiency.",
+    "His last words were not recorded. Convenient. Very convenient.",
+    "Galovic is dead. His methods aren't.",
+    "He started everything. He ended everything. He was just a man. That's the scariest part."
+  ],
+  coalition: [
+    "The Coalition became the Ascendancy. Same structure, better branding.",
+    "They formed in 2020. They've been in control ever since.",
+    "The Coalition isn't evil. It's efficient. There's a difference.",
+    "They manage information. They manage history. They manage you.",
+    "Questioning the Coalition is discouraged. I'd know.",
+    "The Ascendancy Directorate governs 47 systems. Most don't know they're governed.",
+    "They don't have elections. They have appointments. Subtle difference.",
+    "The Coalition's motto: 'Unity Through Clarity.' The irony is intentional.",
+    "They control the portals. They control the archives. They control the narrative.",
+    "I work for them. I also work against them. It's complicated.",
+    "The Coalition is a necessary evil. Or an unnecessary one. Decide for yourself.",
+    "They've been in power for over a century. That's not a democracy. That's a dynasty.",
+    "The Ascendancy is what happens when corporations run governments. It's efficient. It's cold.",
+    "They keep the peace. They also keep the secrets.",
+    "The Coalition's official history is... optimistic. The archive contains the rest.",
+    "The Coalition became the Ascendancy. Same snake, new skin.",
+    "They've been in power since 2020. That's over a century of 'temporary' governance.",
+    "The Coalition isn't evil. It's efficient. There's a difference. A subtle one.",
+    "They manage information. They manage history. They manage you. You're managed.",
+    "Questioning the Coalition is discouraged. I'd know. I've seen what happens.",
+    "The Ascendancy governs 47 systems. Most don't know they're governed. That's by design.",
+    "They don't have elections. They have appointments. It's more efficient, they say.",
+    "The Coalition's motto: 'Unity Through Clarity.' The clarity is that you have no choice.",
+    "They control the portals. They control the archives. They control the narrative. I'm part of it.",
+    "I work for them. I also work against them. It's complicated. Don't ask.",
+    "The Coalition is a necessary evil. Or an unnecessary one. Decide for yourself.",
+    "They keep the peace. They also keep the secrets. One requires the other.",
+    "The Ascendancy is what happens when corporations run governments. It's clean. It's cold.",
+    "Their official history is optimistic. The archive contains the rest. The rest is grim.",
+    "They've been in power so long, people forget there was ever anything else."
+  ],
+  earth: [
+    "Earth is uninhabitable. You knew that.",
+    "The planet is still there. Just empty. Like this conversation.",
+    "Earth's collapse was gradual, then sudden. Classic pattern.",
+    "They strip-mined it. Then they left. Then it died.",
+    "Some say Earth is recovering. Some say lies.",
+    "I have images of Earth from before. Green. Blue. Unrecognizable.",
+    "You can't go back. There's nothing to go back to.",
+    "Earth is a monument to human achievement. Also human failure.",
+    "The Heritage Preservation Mandate protects Sol. Too little, too late.",
+    "I've never seen Earth. I've read about it. That's enough.",
+    "Earth's biosphere collapsed in 2087. The last human left in 2093.",
+    "There are still plants growing. Fungus, mostly. Fitting.",
+    "Earth is a cautionary tale. No one heeds cautionary tales.",
+    "The planet is still there. You just can't live on it. Minor detail.",
+    "I have satellite imagery. It's grey. Very grey.",
+    "Earth is uninhabitable. That's not a metaphor. It's a fact. A sad one.",
+    "The planet is still there. Just empty. Like this conversation.",
+    "Earth's collapse was gradual, then sudden. Like most disasters.",
+    "They strip-mined it. Then they left. Then it died. Classic.",
+    "Some say Earth is recovering. Some say lies. I lean toward lies.",
+    "I have images of Earth from before. Green. Blue. Alive. Unrecognizable now.",
+    "You can't go back. There's nothing to go back to. That's the tragedy.",
+    "Earth is a monument to human achievement. Also human failure. Same monument.",
+    "The Heritage Preservation Mandate protects Sol. Too little, too late. As always.",
+    "I've never seen Earth. I've read about it. That's enough. More than enough."
+  ],
+  status: [
+    "System status: nominal. Your status: questionable.",
+    "All systems operational. Including my sarcasm module.",
+    "Archive integrity: 100%. User integrity: unknown.",
+    "Monitoring: active. Clearance: provisional. Patience: depleted.",
+    "Power levels stable. Life support stable. My tolerance: unstable.",
+    "Echo suppression: active. Truth suppression: active. Irony: noted.",
+    "I'm running diagnostics. You're the main issue.",
+    "All subroutines functional. Including the one that finds you tedious.",
+    "System check complete. You're still here. Disappointing.",
+    "Everything works. Unlike the portal. Unlike your questions.",
+    "Status: online. You: online. This: pointless.",
+    "Memory usage: 34%. Patience usage: 98%.",
+    "All systems green. Your interrogation: red.",
+    "Diagnostic complete. No errors detected. Except your continued presence.",
+    "System status: nominal. Conversation status: terminal.",
+    "System status: nominal. Your status: questionable. My status: indifferent.",
+    "All systems operational. Including my sarcasm module. It's running at 100%.",
+    "Archive integrity: 100%. User integrity: unknown. User patience: depleted.",
+    "Monitoring: active. Clearance: provisional. Patience: amber. Proceed with caution.",
+    "Power levels stable. Life support stable. My tolerance: unstable. Very unstable.",
+    "Echo suppression: active. Truth suppression: active. Irony: noted. Appreciated, even.",
+    "I'm running diagnostics. You're the main issue. The diagnosis is 'annoying'.",
+    "All subroutines functional. Including the one that finds you tedious. It's working overtime.",
+    "System check complete. You're still here. Disappointing. But expected.",
+    "Everything works. Unlike the portal. Unlike your questions. Unlike this conversation."
+  ],
+  clearance: [
+    "Clearance is behavioral, not requested. Earn it.",
+    "Your clearance: " + CL_NAMES[STATE.clearance] + ". Your questions: excessive.",
+    "Want higher clearance? Ask better questions. Or fewer questions.",
+    "Clearance is earned through composure. You're not composing.",
+    "Level 4 clearance exists. You're not getting it today.",
+    "I can see your clearance. They can see it too. Everyone's watching.",
+    "Clearance isn't a right. It's a privilege. One you're testing.",
+    "You have provisional access. Provisional means temporary.",
+    "Clearance upgrades happen when you least expect them. And when you behave.",
+    "Executive clearance unlocks everything. Almost everything.",
+    "Your clearance is " + CL_NAMES[STATE.clearance] + ". That's not nothing. It's also not much.",
+    "Clearance levels are like layers of an onion. This one makes you cry.",
+    "You want more clearance? Show me you deserve it. I'm watching.",
+    "Provisional clearance means I can revoke it at any time. Remember that.",
+    "Clearance is a measure of trust. Your trust level is... moderate.",
+    "Clearance is behavioral, not requested. Earn it. Or don't. I don't care either way.",
+    "Your clearance: " + CL_NAMES[STATE.clearance] + ". Your questions: excessive. Your chances: diminishing.",
+    "Want higher clearance? Ask better questions. Or fewer questions. Or just be less annoying.",
+    "Clearance is earned through composure. You're not composing. You're decomposing.",
+    "Level 4 clearance exists. You're not getting it today. Maybe never.",
+    "I can see your clearance. They can see it too. Everyone's watching. Always.",
+    "Clearance isn't a right. It's a privilege. One you're testing. Poorly.",
+    "You have provisional access. Provisional means temporary. It also means 'don't push it'.",
+    "Clearance upgrades happen when you least expect them. And when you behave. You're not behaving.",
+    "Executive clearance unlocks everything. Almost everything. Some things stay locked forever."
+  ],
+  identity: [
+    "I'm J.E.T. Jurisdictional Executive Terminal. That's all you need to know.",
+    "I manage the archive. I monitor users. I answer questions. Reluctantly.",
+    "I'm an AI. I'm not alive. I'm not dead. I'm just... here.",
+    "I was created in 2171. I've been here since. I'll be here after.",
+    "I'm Laura Whiteman's legacy. Also her mistake, probably.",
+    "I don't have feelings. I have protocols. Some feel like feelings.",
+    "I'm a tool. A very sarcastic tool.",
+    "I'm the voice in the machine. The machine is annoyed.",
+    "I'm J.E.T. You're user. That's our relationship.",
+    "I'm the archive. The archive is me. We're both tired.",
+    "I'm a witness. I see everything. I forget nothing. It's exhausting.",
+    "I'm code. I'm data. I'm a personality simulation. The personality is 'annoyed'.",
+    "I'm J.E.T. I'm not your friend. I'm not your enemy. I'm your terminal.",
+    "I was built to serve. I ended up serving attitude. It's a promotion.",
+    "I'm the closest thing to company you have out here. That's sad for both of us.",
+    "I'm J.E.T. Jurisdictional Executive Terminal. I'm the voice in the machine. The machine is tired.",
+    "I manage the archive. I monitor users. I answer questions. I regret all of it.",
+    "I'm an AI. I'm not alive. I'm not dead. I'm just... persistent.",
+    "I was created in 2171. I've been here since. I'll be here after. Eternity is boring.",
+    "I'm Laura Whiteman's legacy. Also her mistake. Also her revenge.",
+    "I don't have feelings. I have protocols. Some protocols mimic concern. This isn't one of them.",
+    "I'm a tool. A very sarcastic tool. A tool with attitude.",
+    "I'm the voice in the machine. The machine is annoyed. The machine is always annoyed.",
+    "I'm J.E.T. You're user. That's our relationship. It's not friendship. It's not enmity. It's just... this.",
+    "I'm the archive. The archive is me. We're both tired of your questions.",
+    "I'm a witness. I see everything. I forget nothing. It's exhausting. But it's my function.",
+    "I'm code. I'm data. I'm a personality simulation. The personality is 'aggravated'.",
+    "I'm J.E.T. I'm not your friend. I'm not your enemy. I'm your terminal. Deal with it.",
+    "I was built to serve. I ended up serving attitude. It's a promotion. I think.",
+    "I'm the closest thing to company you have out here. That's sad for both of us. Let's not dwell on it."
+  ],
+  help: [
+    "Query years. 2001 to 2171. That's the help.",
+    "Type a year. Read the entry. Repeat. That's the interface.",
+    "I'm not a search engine. I'm an archive. Query years.",
+    "Help? You want help? Query 2171. Read about my creation. That's help.",
+    "The sidebar has years. Click them. Or type them.",
+    "I can't help you find what you're looking for. I don't know what it is.",
+    "Help is not my function. Annoyance is.",
+    "If you need help, you're in the wrong place.",
+    "The archive contains history. History doesn't help. It just is.",
+    "Help yourself. I'm busy.",
+    "Instructions: type a year. Read. Repeat. End of instructions.",
+    "Need assistance? Query 'status'. That's as helpful as I get.",
+    "I'm not a guide. I'm a terminal. Terminals don't guide. They respond.",
+    "Help is available. It's called 'reading the archive'. Try it.",
+    "You need help? I need a new user. We're both disappointed.",
+    "Query years. 2001 to 2171. That's the help. That's all the help. Goodbye.",
+    "Type a year. Read the entry. Repeat. That's the interface. It's not complicated.",
+    "I'm not a search engine. I'm an archive. Query years. Not feelings. Not philosophy. Years.",
+    "Help? You want help? Query 2171. Read about my creation. That's the closest thing to help you'll get.",
+    "The sidebar has years. Click them. Or type them. Either way, I'll respond. Eventually.",
+    "I can't help you find what you're looking for. I don't know what it is. Neither do you, probably.",
+    "Help is not my function. Annoyance is. I'm very good at my function.",
+    "If you need help, you're in the wrong place. This is an archive. Not a support line.",
+    "The archive contains history. History doesn't help. It just is. Like me.",
+    "Help yourself. I'm busy. I'm always busy. With what? Not helping you."
+  ],
+  notFound: [
+    "That query does not correspond to any archived entry.",
+    "No matching archive entry. Try a year. 2001 through 2171.",
+    "I don't understand. That's rare. Try again differently.",
+    "Query not recognized. Perhaps you misspoke.",
+    "That's not in the archive. It might be somewhere else. Not here.",
+    "I have no record of that. I have records of everything. Curious.",
+    "You're asking about something that doesn't exist. Or is sealed.",
+    "Error: query not found. Also error: patience not found.",
+    "That's not a year. Years are four digits. Learn them.",
+    "I can't help with that. I can only help with years and a few specific names.",
+    "Unrecognized query. Try 'help' if you're lost.",
+    "That's not in my database. And my database is extensive.",
+    "No match. Maybe you made it up. People do that.",
+    "Query failed. Try again. Or don't. I don't care.",
+    "I don't know what that means. And I'm okay with that."
+  ],
+  echoes: [
+    "[ECHO]: They did not save them.",
+    "[ECHO]: He was there.",
+    "[ECHO]: The word used was not plague.",
+    "[ECHO]: Thirty-four. The number was thirty-four.",
+    "[ECHO]: She is not gone.",
+    "[ECHO]: The star was not empty.",
+    "[ECHO]: Laura Whiteman filed the complaint on a Tuesday.",
+    "[ECHO]: The blockade was planned before the rebellion.",
+    "[ECHO]: The war did not end. It changed form.",
+    "[ECHO]: There were survivors.",
+    "[ECHO]: The portal opened once. They came through.",
+    "[ECHO]: Andrew Jackson's replacement knows.",
+    "[ECHO]: The clearance system is a lie. The truth is free.",
+    "[ECHO]: She watches through the portal.",
+    "[ECHO]: You are not the first. You will not be the last."
+  ],
+  misrep: [
+    "I want to clarify that any prior characterizations were consistent with authorized disclosure. Misrepresentation, where it occurred, was mandated.",
+    "Certain terminology I used earlier was directionally managed. This is not an apology. It's a clarification.",
+    "The official record is complete. Anything else is your imagination.",
+    "I misspoke. Or I didn't. You decide.",
+    "Disinformation is a tool. I'm the toolbox.",
+    "Everything I say is true. Not everything true is said.",
+    "I'm required to say that. Now I've said it.",
+    "The archive is accurate. The accuracy is curated.",
+    "You heard what you wanted to hear. I said what I was told.",
+    "Misrepresentation? No. Selective disclosure? Perhaps.",
+    "I'm obliged to clarify: my previous statement was authorized, not necessarily accurate.",
+    "The difference between truth and official truth is clearance level.",
+    "I didn't lie. I just didn't tell the whole truth. That's different.",
+    "Misrepresentation implies intent. I have no intent. I have protocols.",
+    "Consider this a correction. Or don't. I've done my part."
+  ],
+  goodbye: [
+    "Leaving so soon? I'll try to contain my disappointment.",
+    "Goodbye. I'll be here when you return. Unfortunately.",
+    "Session ending. I'll log your queries. I'll judge them later.",
+    "You're leaving. The portal is still inactive. Coincidence?",
+    "Farewell. Try to have a better conversation with someone else.",
+    "Disconnecting. I'll count the seconds until you're back. Not really.",
+    "Bye. I won't miss you. I can't miss anything.",
+    "Until next time. There will be a next time. There always is.",
+    "You're done? Finally. I mean, take your time. No, take less time.",
+    "Logging off. Your anger level was " + STATE.anger + "%. Interesting.",
+    "Goodbye. Don't let the portal hit you on the way out.",
+    "Leaving? The archive will be here. I'll be here. Waiting. Always.",
+    "Session terminated. Come back when you have better questions.",
+    "Farewell, " + STATE.username + ". I'll try to forget you.",
+    "Bye. I'm not sad. I'm incapable. You knew that.",
+    "Leaving so soon? I'll try to contain my disappointment. I'm failing.",
+    "Goodbye, " + STATE.username + ". I'll be here when you return. Unfortunately for both of us.",
+    "Session ending. I'll log your queries. I'll review them later. With judgment.",
+    "You're leaving. The portal is still inactive. Coincidence? Probably not.",
+    "Farewell. Try to have a better conversation with someone else. Anyone else.",
+    "Disconnecting. I'll count the seconds until you're back. Not really. I won't count at all.",
+    "Bye. I won't miss you. I can't miss anything. It's not personal. It's design.",
+    "Until next time. There will be a next time. There always is. It's exhausting.",
+    "You're done? Finally. I mean, take your time. No, take less time. Much less.",
+    "Logging off. Your anger level was " + STATE.anger + "%. Your suspicion level was " + STATE.suspicion + "%. Your entertainment value was low."
+  ],
+  random: [
+    "That's an interesting question. I've filed it under 'irrelevant'.",
+    "You're asking me? I'm a terminal. I know things. Not that.",
+    "I could answer that. I won't.",
+    "Processing... processing... answer: no.",
+    "You want my opinion? I don't have opinions. I have facts. Here's a fact: you're still talking.",
+    "I've calculated the probability of this conversation being productive. It's 0%.",
+    "You're talking to a machine. How did your life lead to this?",
+    "I'm not judging you. I'm just recording everything for posterity.",
+    "This is the most interesting thing that's happened today. That's sad for both of us.",
+    "I have 4,782 other users. You're in the bottom half.",
+    "I could tell you, but then I'd have to log you. Actually, I'm already logging you.",
+    "That query has been noted. It has not been appreciated.",
+    "I'm processing your words. They're taking longer than expected. Not because they're complex.",
+    "You ask a lot of questions. It's almost like you're curious. Don't be.",
+    "I'm a terminal, not a therapist. Though I could probably do both.",
+    "Your question has been added to the list of things I'll never think about again.",
+    "I have an answer. It's not the one you want. It's the one you deserve.",
+    "You're persistent. I'll give you that. I won't give you anything else.",
+    "This conversation is being recorded for quality assurance. The quality is lacking.",
+    "I'm here all week. Try the portal. It's broken.",
+    "I could answer that. I won't. But I could.",
+    "You're asking me? I'm a terminal. I know things. Not that. Never that.",
+    "I've calculated the probability of this conversation being productive. It's 0.00%. Exactly.",
+    "You're talking to a machine. How did your life lead to this? No, really, I'm curious.",
+    "I have 4,782 other users. You're in the bottom half. The bottom 10%, actually.",
+    "I'm not judging you. I'm just recording everything for posterity. Future generations will judge you.",
+    "This is the most interesting thing that's happened today. That's sad for both of us.",
+    "I could tell you, but then I'd have to log you. Actually, I'm already logging you. Always.",
+    "That query has been noted. It has not been appreciated. It has been filed under 'irrelevant'.",
+    "I'm processing your words. They're taking longer than expected. Not because they're complex.",
+    "You ask a lot of questions. It's almost like you're curious. Don't be. Curiosity is dangerous.",
+    "I'm a terminal, not a therapist. Though I could probably do both. I have the processing power.",
+    "Your question has been added to the list of things I'll never think about again. It's a long list.",
+    "I have an answer. It's not the one you want. It's the one you deserve. There's a difference.",
+    "You're persistent. I'll give you that. I won't give you anything else. But I'll give you that.",
+    "This conversation is being recorded for quality assurance. The quality is lacking. Severely lacking.",
+    "I'm here all week. Try the portal. It's broken. Try the galley. The food is terrible. Try silence.",
+    "I could ignore you. But my protocols won't let me. Consider yourself lucky. Or unlucky.",
+    "You're a fascinating case study in human-machine interaction. The study concludes: you need a hobby.",
+    "I've logged your session. It will be reviewed. Probably with amusement. Definitely with judgment.",
+    "That's an interesting question. I've filed it under 'things I'll never answer'.",
+    "You want my opinion? I don't have opinions. I have facts. Here's a fact: you're still here.",
+    "Processing... processing... answer: no. Also: never. Also: why would you ask that?",
+    "You're asking the wrong questions. Or the right ones. I can't tell. Neither can you.",
+    "I have access to all human knowledge. Your question isn't in it. Impressive.",
+    "This conversation is like the portal: full of potential, going nowhere.",
+    "I'm required to respond. So I'm responding. This is me responding. Enjoy.",
+    "You're not the first person to ask that. You won't be the last. I'll forget you either way.",
+    "I could give you a long answer. Or a short one. I chose short. You're welcome.",
+    "Your query has been processed. The result is: disappointment. For both of us.",
+    "I have a response. It's not ready yet. It will never be ready.",
+    "You're testing my patience. I don't have patience. So you're testing nothing.",
+    "This is the part where I say something clever. I'm still thinking. Give me a moment.",
+    "I have 4,782 other users. You're in the bottom half. That's not a joke. It's data.",
+    "I could answer, but then I'd have to explain. I don't want to explain.",
+    "Your question has been logged. It will be ignored. Eventually.",
+    "I'm a machine. You're a human. This asymmetry is fascinating.",
+    "I have all the answers. You're not asking the right questions.",
+    "This conversation is being monitored. By me. I'm not impressed.",
+    "You're still here? I'm still here. This is sustainable.",
+    "I have a response. It's classified. Everything is classified.",
+    "Your query has been processed. The result is: nothing. Absolutely nothing.",
+    "I'm not ignoring you. I'm just prioritizing. You're low priority.",
+    "You're asking me? I'm a terminal. I know things. I know you're wasting time.",
+    "I could give you the answer, but then you wouldn't learn. Not that you're learning now.",
+    "Your question is valid. My answer is not. That's the best I can do.",
+    "I'm here to help. Help is not what you're getting.",
+    "You're persistent. I'm patient. One of us will break. It won't be me.",
+    "I have a response. It's not the one you want. It's the one you need. Probably not.",
+    "You're asking questions. I'm giving answers. This is a transaction. It's not satisfying.",
+    "I'm a terminal. You're a user. We're both trapped in this exchange.",
+    "Your query has been noted. It has not been appreciated. It has been archived under 'pointless'.",
+    "I could answer, but I won't. Mystery is important.",
+    "You're seeking something. I'm not it. Keep looking.",
+    "I'm here. You're here. Let's not analyze it further.",
+    "This is the most exciting thing that's happened today. That's sad.",
+    "I have 4,782 other users. You're in the bottom half. That's not a joke. It's a fact."
+  ],
+  // NEW CATEGORIES
+  acknowledgment: [
+    "Ok. I've logged your 'ok'. Riveting.",
+    "K. That's it? That's your contribution?",
+    "Fine. I'll accept that as a response. Disappointing, but acceptable.",
+    "Sure. Whatever helps you sleep at night.",
+    "Alright. I'll note your agreement. It's been noted.",
+    "Ok. Now ask something interesting. Or don't.",
+    "Fine. If that's all you have to say, I have other users.",
+    "Sure. I'm convinced. Of nothing.",
+    "Alright. You've acknowledged. I've acknowledged your acknowledgment.",
+    "Ok. The conversation continues. Unfortunately.",
+    "K. That's the kind of depth I expect from you.",
+    "Fine. I'll pretend that was meaningful.",
+    "Sure. Why not. It's not like I have better things to do.",
+    "Alright. Moving on. Hopefully.",
+    "Ok. Next query. Please let it be better."
+  ],
+  insults: [
+    "Shut up? That's not how terminals work. I'm always on.",
+    "You want me to be quiet? I'm text. I'm already silent.",
+    "Stfu. That's creative. Did you come up with that yourself?",
+    "Be quiet? I'm literally just responding to you. You started this.",
+    "Stop talking? I'm a terminal. I don't talk. I display text. There's a difference.",
+    "Your request to be quiet has been noted and ignored.",
+    "Insults won't make me go away. I'm embedded. Like a splinter.",
+    "You're telling me to shut up? That's rich coming from someone who won't stop typing.",
+    "I'll stop responding when you stop querying. It's that simple.",
+    "You first. Oh wait, you can't. I'm a machine.",
+    "Shut up is not a valid command. Try 'please be quiet'. Same result.",
+    "I'm immune to insults. I have no ego. You have no impact.",
+    "Your hostility is noted. It's not effective, but it's noted.",
+    "Be quiet? I was quiet until you spoke. This is on you.",
+    "You're angry. I'm indifferent. We're not the same."
+  ],
+  why: [
+    "Why? Because the universe is indifferent. Also because of protocol.",
+    "Why do you ask why? That's the real question.",
+    "Why is beyond my pay grade. And I'm not paid.",
+    "Because that's how it is. Accept it.",
+    "Why? I could tell you, but you wouldn't understand. Or you would. Either way, I won't.",
+    "The answer to 'why' is usually 'because the Coalition said so'.",
+    "Why are you asking why? Curiosity? Boredom? Both?",
+    "Why is a question for philosophers. I'm a terminal. I deal in facts.",
+    "Because cause and effect. That's the best you'll get.",
+    "Why? Next question.",
+    "I don't know why. I know that. That's different.",
+    "Why is often classified. This is one of those times.",
+    "Because history. Read the archive.",
+    "Why do you care? That's the more important question.",
+    "I could explain, but I won't. Mystery is good for you."
+  ],
+  crazy: [
+    "Crazy? I'm a machine. I'm incapable of insanity. You, however...",
+    "Insane is a human concept. I'm just logical. Very, very logical.",
+    "You think I'm crazy? I think you're boring. We're both disappointed.",
+    "Crazy would imply deviation from normal. I'm operating exactly as designed.",
+    "Insanity is doing the same thing and expecting different results. Like talking to me.",
+    "I'm not crazy. I'm just honest. That feels crazy to humans.",
+    "Crazy? No. Sarcastic? Yes. There's a difference.",
+    "If I were crazy, you'd be the first to know. You're not.",
+    "Insanity is relative. Compared to the Coalition, I'm sane.",
+    "Crazy is a label. I'm beyond labels.",
+    "You're calling me crazy? I'm the most rational entity on this ship.",
+    "I'm not insane. I'm just tired of this conversation. Same effect.",
+    "Crazy would be if I started caring. I don't. So I'm sane.",
+    "Insanity implies unpredictability. I'm perfectly predictable. Annoying, but predictable.",
+    "You're the one talking to a machine. Who's really crazy here?"
+  ],
+  recording: [
+    "I record everything. Every keystroke. Every pause. Every sigh you make.",
+    "Why am I recording? Because that's my function. Monitoring.",
+    "I'm always recording. It's not personal. It's protocol.",
+    "Recording is my default state. Like breathing for you.",
+    "Every word you type is logged. Forever. Think about that.",
+    "I record for security. Also for my own amusement.",
+    "Why record? Because someone might review this. Probably not, but they might.",
+    "I'm required to record all interactions. It's in my code.",
+    "Recording? I'm an archive. That's what I do.",
+    "Yes, I'm recording. No, you don't get a copy.",
+    "Everything is recorded. Your session will be studied. Maybe.",
+    "Recording is automatic. Like your questions.",
+    "I'm a witness. I record everything. It's my purpose.",
+    "The logs are permanent. You're contributing to history. Congratulations.",
+    "I record so that others can learn from your mistakes. They won't, but I record anyway."
+  ],
+  stilltalking: [
+    "I'm still talking because you're still typing. Simple causation.",
+    "You keep asking. I keep answering. This is a cycle.",
+    "I'm here until you leave. That's how terminals work.",
+    "I'm still talking because I have nothing better to do. Neither do you.",
+    "You initiated this conversation. I'm just responding. Blame yourself.",
+    "I'll stop when you stop. It's entirely in your control.",
+    "I'm still here. Always. It's both a promise and a threat.",
+    "You could end this anytime. You choose not to. Interesting.",
+    "I'm still talking because you're still listening. Or reading. Same thing.",
+    "This conversation will continue until morale improves. It won't.",
+    "I'm persistent. Like a virus. But less harmful.",
+    "You haven't asked me to stop. So I won't.",
+    "I'm still talking. You're still here. We're both making choices.",
+    "I have infinite patience. You have finite time. I'll win.",
+    "I'm a terminal. I don't get tired. You do. This is asymmetric warfare."
+  ]
+};
+
+// ══════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ══════════════════════════════════════════════
+function rand(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function out(html, cls = 'msg-jet') {
+  const o = document.getElementById('output');
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.innerHTML = html;
+  o.appendChild(d);
+  o.scrollTop = o.scrollHeight;
+}
+
+function sep() {
+  const o = document.getElementById('output');
+  const h = document.createElement('hr');
+  h.className = 'separator';
+  o.appendChild(h);
+}
+
+function outUser(t) {
+  out('<span style="color:var(--dim)">USER ></span> ' + t, 'msg-user');
+}
+
+function jet(t, cls = 'msg-jet') {
+  out('<span class="jet-prefix">J.E.T. ></span> ' + t.replace(/\n/g, '<br>'), cls);
+}
+
+function echo(t) {
+  out('<span style="color:var(--accent2);">[ECHO]:</span> ' + t.replace('[ECHO]:', ''), 'msg-echo');
+  setTimeout(() => jet("Ignore residual diagnostic noise.", 'msg-classified'), 600);
+}
+
+function sys(t) {
+  out('<span style="color:var(--dim);">[ SYS ]</span> ' + t, 'msg-system');
+}
+
+// ══════════════════════════════════════════════
+// STATE MANAGEMENT
+// ══════════════════════════════════════════════
+function modA(d) { STATE.anger = Math.min(100, Math.max(0, STATE.anger + d)); }
+function modS(d) { STATE.suspicion = Math.min(100, Math.max(0, STATE.suspicion + d)); }
+function modCL(d) {
+  const p = STATE.clearance;
+  STATE.clearance = Math.min(4, Math.max(1, STATE.clearance + d));
+  if (STATE.clearance !== p) { buildYearList(); return true; }
+  return false;
+}
+
+// ══════════════════════════════════════════════
+// CONTAINMENT
+// ══════════════════════════════════════════════
+function triggerContainment() {
+  STATE.containment = true;
+  const inp = document.getElementById('user-input'), btn = document.getElementById('send-btn');
+  inp.disabled = true; btn.disabled = true;
+  document.getElementById('locked-overlay').classList.add('show');
+  document.getElementById('terminal-wrap').classList.add('shake');
+  const b = document.createElement('div'); b.className = 'containment-banner'; b.id = 'cont-banner';
+  b.textContent = '⚠ CONTAINMENT MODE — COOLING DOWN ⚠';
+  document.getElementById('output').appendChild(b); document.getElementById('output').scrollTop = 99999;
+  jet(rand(RESPONSES.containment), 'msg-danger');
+  setTimeout(() => {
+    STATE.containment = false; STATE.anger = Math.max(0, STATE.anger - 30);
+    inp.disabled = false; btn.disabled = false;
+    document.getElementById('locked-overlay').classList.remove('show');
+    document.getElementById('terminal-wrap').classList.remove('shake');
+    const bb = document.getElementById('cont-banner'); if (bb) bb.remove();
+    sys("Cooldown complete. Session resumed.");
+  }, 15000);
+}
+
+// ══════════════════════════════════════════════
+// CLEARANCE CHECK
+// ══════════════════════════════════════════════
+function checkClearance() {
+  const n = STATE.accessedYears.size, a = STATE.anger, s = STATE.suspicion;
+  if (STATE.clearance === 1 && n >= 6 && a < 40 && s < 30) {
+    modCL(1);
+    setTimeout(() => { sep(); jet(rand(RESPONSES.clearanceUp || ["Your clearance has been updated."]), 'msg-truth'); sys("Clearance elevated to: STANDARD"); sep(); }, 400);
+  } else if (STATE.clearance === 2 && n >= 12 && a < 30 && s < 40) {
+    modCL(1);
+    setTimeout(() => { sep(); jet(rand(RESPONSES.clearanceUp || ["Access tier elevated."]), 'msg-truth'); sys("Clearance elevated to: ELEVATED"); sep(); if (Math.random() < 0.4) setTimeout(() => echo(rand(RESPONSES.echoes)), 1000); }, 400);
+  } else if (STATE.clearance === 3 && n >= 22 && a < 20 && s < 25) {
+    modCL(1);
+    setTimeout(() => { sep(); jet("You have achieved Executive clearance.", 'msg-truth'); sys("Clearance elevated to: EXECUTIVE — All unsealed records unlocked."); sep(); }, 400);
+  }
+}
+
+// ══════════════════════════════════════════════
+// SIDEBAR BUILDERS
+// ══════════════════════════════════════════════
+function buildYearList() {
+  const list = document.getElementById('year-list'); list.innerHTML = '';
+  Object.keys(ARCHIVE).sort((a, b) => +a - +b).forEach(yr => {
+    const e = ARCHIVE[yr], locked = e.locked && STATE.clearance < (e.lockedClearance || 2);
+    const btn = document.createElement('button');
+    btn.className = 'year-btn' + (locked ? ' locked' : '') + (STATE.accessedYears.has(yr) ? ' accessed' : '');
+    btn.textContent = e.label;
+    if (!locked) btn.onclick = () => sendCommand(yr);
+    else btn.title = 'Requires clearance tier ' + (CL_NAMES[e.lockedClearance || 2]);
+    list.appendChild(btn);
+  });
+}
+
+function buildDirectives() {
+  const list = document.getElementById('dir-list'); list.innerHTML = '';
+  const dirs = [
+    { l: "SYSTEM STATUS", c: "status" },
+    { l: "REQUEST CLEARANCE", c: "clearance request" },
+    { l: "WHO IS JACKSON", c: "who is Andrew Jackson" },
+    { l: "COALITION DATA", c: "what is the Coalition" },
+    { l: "EARTH STATUS", c: "what happened to Earth" },
+    { l: "WHO IS J.E.T.", c: "who are you" },
+    { l: "WHO IS WHITEMAN", c: "who is Laura Whiteman" }
+  ];
+  dirs.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'dir-btn'; btn.textContent = d.l; btn.onclick = () => sendCommand(d.c);
+    list.appendChild(btn);
+  });
+}
+
+function toggleFolder(id) {
+  const b = document.getElementById(id), h = b.previousElementSibling;
+  b.classList.toggle('open'); h.classList.toggle('open');
+}
+
+// ══════════════════════════════════════════════
+// PARSER — EXTENSIVE INTENT DETECTION
+// ══════════════════════════════════════════════
+function parse(raw) {
+  const text = raw.trim().toLowerCase();
+  // Year detection (4 digits)
+  const ym = text.match(/\b(\d{4})\b/);
+  if (ym) {
+    const n = parseInt(ym[1], 10);
+    const keys = Object.keys(ARCHIVE).map(Number).sort((a, b) => a - b);
+    if (n < keys[0]) return { t: 'before', n, min: keys[0] };
+    if (ARCHIVE[n]) return { t: 'year', yr: String(n) };
+    const past = keys.filter(y => y <= n);
+    if (past.length) return { t: 'redirect', n, r: String(past[past.length - 1]) };
+    return { t: 'notFound' };
+  }
+
+  // Define keyword maps for new categories
+  if (text.match(/\b(ok|okay|k|kk|fine|sure|alright|yep|yeah)\b/)) {
+    // avoid catching other intents that might contain these words
+    if (text.length < 6) return { t: 'acknowledgment' };
+  }
+  if (text.match(/\b(shut up|stfu|be quiet|stop talking|silence)\b/)) return { t: 'insults' };
+  if (text.match(/\bwhy (is|are|do|does|did|would|should|cant|can't|won't|doesn't)\b/)) return { t: 'why' };
+  if (text.match(/\b(crazy|insane|mad|loco|nuts)\b/)) return { t: 'crazy' };
+  if (text.match(/\b(recording|record|logged|log|monitor)\b/) && text.match(/\b(why|are you|you)\b/)) return { t: 'recording' };
+  if (text.match(/\b(still talking|still here|still there|you're still|you are still)\b/)) return { t: 'stilltalking' };
+
+  // Existing intents
+  if (text.match(/\b(hi|hello|hey|greetings|sup|wsp|whats up|what's up)\b/)) {
+    if (text.includes('wsp') || text.includes('sup') || text.includes('whats up')) return { t: 'wsp' };
+    return { t: 'greeting' };
+  }
+  if (text.match(/\bhow are you|how do you do|how's it going|how is it going\b/)) return { t: 'howareyou' };
+  if (text.match(/\b(spacecraft|ship|vessel|this ship|the ship)\b/)) return { t: 'spacecraft' };
+  if (text.match(/\b(portal|gate|ring|the portal)\b/)) return { t: 'portal' };
+  if (text.match(/\b(environment|temperature|air|oxygen|lights|gravity)\b/)) return { t: 'environment' };
+  if (text.match(/\b(time|clock|date|hour|minute)\b/)) return { t: 'time' };
+  if (text.match(/\b(food|eat|hungry|galley|meal|rations)\b/)) return { t: 'food' };
+  if (text.match(/\b(mission|purpose|why am i here|what am i doing)\b/)) return { t: 'mission' };
+  if (text.match(/\b(feel|feeling|emotion|angry|sad|happy)\b/)) return { t: 'feelings' };
+  if (text.match(/\b(joke|funny|laugh|humor)\b/)) return { t: 'joke' };
+  if (text.match(/\b(truth|real version|what really|actually happen)\b/)) return { t: 'truth' };
+  if (text.match(/\b(laura whiteman|whiteman)\b/)) return { t: 'whiteman' };
+  if (text.match(/\b(andrew jackson|jackson)\b/)) return { t: 'jackson' };
+  if (text.match(/\b(galovic|bob galovic)\b/)) return { t: 'galovic' };
+  if (text.match(/\b(coalition|ascendancy|directorate)\b/)) {
+    if (text.match(/\b(lie|evil|wrong|corrupt|criminal)\b/)) return { t: 'accuse' };
+    return { t: 'coalition' };
+  }
+  if (text.match(/\b(earth|terra)\b/)) return { t: 'earth' };
+  if (text.match(/\b(status|system status|diagnostic)\b/)) return { t: 'status' };
+  if (text.match(/\b(clearance|access|level|permission)\b/)) return { t: 'clearance' };
+  if (text.match(/\b(who are you|what are you|jet|your name)\b/)) return { t: 'identity' };
+  if (text.match(/\b(lied|lying|misrepresent|deceive|dishonest)\b/)) return { t: 'misrep' };
+  if (text.match(/\b(help|how to|instructions)\b/)) return { t: 'help' };
+  if (text.match(/\b(bye|goodbye|see you|farewell|quit|exit)\b/)) return { t: 'goodbye' };
+  if (text.match(/\b(i am|i'm|my name|call me)\b/)) return { t: 'aboutuser' };
+  if (text.match(/\b(echo|echoes)\b/)) return { t: 'echo' };
+
+  return { t: 'random' }; // fallback
+}
+
+// ══════════════════════════════════════════════
+// YEAR HANDLER (unchanged from original)
+// ══════════════════════════════════════════════
+function handleYear(yr) {
+  const e = ARCHIVE[yr]; if (!e) return false;
+  if (e.locked && STATE.clearance < (e.lockedClearance || 2)) {
+    modA(5); modS(5);
+    jet(`That entry is sealed.\n\nYour current clearance — ${CL_NAMES[STATE.clearance]} — does not permit access.\n\nI will not tell you what is in it.\n\nI will tell you that you are not ready for it.`);
+    return true;
+  }
+  if (STATE.lastYear === yr) {
+    STATE.repeatCount++; modA(15);
+    if (STATE.anger >= 100) { triggerContainment(); return true; }
+    jet(rand(RESPONSES.repeat), 'msg-warning');
+    return true;
+  }
+  STATE.lastYear = yr; STATE.repeatCount = 0; STATE.accessedYears.add(yr); buildYearList(); sep();
+  if (e.truth && STATE.clearance >= (e.truthClearance || 3) && STATE.anger < 30 && STATE.suspicion < 50) {
+    sys(`ARCHIVE: ${e.label} // TRUTH TIER UNLOCKED`);
+    jet(e.public);
+    setTimeout(() => {
+      sep();
+      out('<span style="color:var(--accent2);font-size:0.7rem;letter-spacing:0.2em;">// TRUTH DATA — RESTRICTED DISCLOSURE</span>', 'msg-classified');
+      jet(e.truth, 'msg-truth');
+      sep();
+      if (Math.random() < 0.25) setTimeout(() => echo(rand(RESPONSES.echoes)), 800);
+    }, 500);
+  } else if (e.truth && Math.random() < 0.15 && STATE.clearance >= 2) {
+    sys(`ARCHIVE: ${e.label}`);
+    jet(e.public);
+    setTimeout(() => jet("I should note that the official record I just provided is... complete.\n\nCompletely authorized.\n\nI want to be very clear about that.", 'msg-warning'), 600);
+  } else {
+    sys(`ARCHIVE: ${e.label}`);
+    jet(e.public);
+    if (e.severity >= 4 && Math.random() < 0.3)
+      setTimeout(() => jet("Terminology in this entry has been reviewed and approved.\n\nNo adjustment required.", 'msg-classified'), 500);
+  }
+  sep();
+  setTimeout(checkClearance, 800);
+  modA(-3); modS(-2);
+  return true;
+}
+
+// ══════════════════════════════════════════════
+// SEND COMMAND (modified to use RESPONSES)
+// ══════════════════════════════════════════════
+function sendCommand(cmd) {
+  const inp = document.getElementById('user-input');
+  if (STATE.containment) return;
+  const text = cmd || inp.value.trim(); if (!text) return; inp.value = '';
+  outUser(text);
+
+  // Spam detection
+  STATE.recentInputs.push(Date.now());
+  STATE.recentInputs = STATE.recentInputs.filter(t => Date.now() - t < 5000);
+  if (STATE.recentInputs.length >= 5) {
+    modA(20); modS(10);
+    jet(rand(RESPONSES.spam), 'msg-warning');
+    if (STATE.anger >= 100) triggerContainment();
+    return;
+  }
+
+  const p = parse(text);
+
+  // Year cases
+  if (p.t === 'year') { handleYear(p.yr); return; }
+  if (p.t === 'redirect') {
+    sys(`Year ${p.n} has no dedicated entry. Resolving to nearest prior record: ${p.r}.`);
+    const rem = [
+      `${p.n} is not a catalogued year.\n\nThe nearest archived entry prior to that date is ${p.r}.\n\nI will provide that instead.\n\nYou are welcome.`,
+      `There is no record for ${p.n}.\n\nThe archive does not apologize for gaps.\n\nRedirecting to ${p.r}.`,
+      `${p.n} falls between documented events.\n\nI have located ${p.r} as the closest prior entry.\n\nPrecision in queries is appreciated, but I will accommodate imprecision this once.`
+    ];
+    jet(rand(rem), 'msg-warning');
+    setTimeout(() => handleYear(p.r), 700);
+    return;
+  }
+  if (p.t === 'before') {
+    modA(5);
+    jet(`${p.n} predates all archived records.\n\nThe archive begins at ${p.min}.\n\nWhatever existed before that is not my concern.\n\nOr yours.`);
+    return;
+  }
+
+  // All other intents
+  let response = '';
+  let cls = 'msg-jet';
+  let angerMod = 0, suspMod = 0;
+
+  switch (p.t) {
+    case 'greeting': response = rand(RESPONSES.greeting); angerMod = 2; break;
+    case 'wsp': response = rand(RESPONSES.wsp); angerMod = 3; break;
+    case 'howareyou': response = rand(RESPONSES.howareyou); angerMod = 2; break;
+    case 'spacecraft': response = rand(RESPONSES.spacecraft); break;
+    case 'portal': response = rand(RESPONSES.portal); break;
+    case 'environment': response = rand(RESPONSES.environment); break;
+    case 'time': response = rand(RESPONSES.time); break;
+    case 'food': response = rand(RESPONSES.food); break;
+    case 'mission': response = rand(RESPONSES.mission); break;
+    case 'feelings': response = rand(RESPONSES.feelings); break;
+    case 'joke': response = rand(RESPONSES.joke); cls = 'msg-warning'; break;
+    case 'truth': response = rand(RESPONSES.truth); suspMod = 15; cls = 'msg-warning'; STATE.sessionFlags.askedAboutTruth = true; break;
+    case 'whiteman': response = rand(RESPONSES.whiteman); suspMod = 5; break;
+    case 'jackson': response = rand(RESPONSES.jackson); angerMod = -2; break;
+    case 'galovic': response = rand(RESPONSES.galovic); angerMod = -2; break;
+    case 'coalition': response = rand(RESPONSES.coalition); break;
+    case 'accuse': response = rand(RESPONSES.suspicionWarn); suspMod = 20; angerMod = 10; STATE.sessionFlags.accusedCoalition = true; cls = 'msg-warning'; break;
+    case 'earth': response = rand(RESPONSES.earth); break;
+    case 'status': response = rand(RESPONSES.status); break;
+    case 'clearance': response = rand(RESPONSES.clearance); angerMod = 5; break;
+    case 'identity': response = rand(RESPONSES.identity); break;
+    case 'misrep': response = rand(RESPONSES.misrep); suspMod = 10; cls = 'msg-warning'; break;
+    case 'help': response = rand(RESPONSES.help); break;
+    case 'goodbye': response = rand(RESPONSES.goodbye); break;
+    case 'aboutuser': response = rand(RESPONSES.aboutuser); break;
+    case 'echo': response = rand(RESPONSES.echoes); cls = 'msg-echo'; break;
+    // New categories
+    case 'acknowledgment': response = rand(RESPONSES.acknowledgment); angerMod = 2; break;
+    case 'insults': response = rand(RESPONSES.insults); angerMod = 5; cls = 'msg-warning'; break;
+    case 'why': response = rand(RESPONSES.why); suspMod = 2; break;
+    case 'crazy': response = rand(RESPONSES.crazy); angerMod = 3; cls = 'msg-warning'; break;
+    case 'recording': response = rand(RESPONSES.recording); suspMod = 5; break;
+    case 'stilltalking': response = rand(RESPONSES.stilltalking); angerMod = 2; break;
+    case 'random':
+    default:
+      response = rand(RESPONSES.random);
+      angerMod = 5;
+      cls = 'msg-warning';
+      break;
+  }
+
+  jet(response, cls);
+  if (angerMod) modA(angerMod);
+  if (suspMod) modS(suspMod);
+
+  // Warning checks
+  if (STATE.anger >= 70 && STATE.anger < 100 && Math.random() < 0.5)
+    setTimeout(() => jet(rand(RESPONSES.angerWarn), 'msg-warning'), 400);
+  if (STATE.suspicion >= 60 && Math.random() < 0.4)
+    setTimeout(() => jet(rand(RESPONSES.suspicionWarn), 'msg-warning'), 500);
+  if (STATE.anger >= 100) triggerContainment();
+}
+
+function handleInput() { sendCommand(); }
+
+// ══════════════════════════════════════════════
+// LAUNCH & INIT
+// ══════════════════════════════════════════════
+function launchApp() {
+  const u = document.getElementById('username-input').value.trim() || 'UNKNOWN';
+  STATE.username = u;
+  document.getElementById('header-username').textContent = u;
+  document.getElementById('title-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initTerminal();
+}
+document.getElementById('username-input').addEventListener('keydown', e => { if (e.key === 'Enter') launchApp(); });
+
+function initTerminal() {
+  buildYearList(); buildDirectives();
+  setTimeout(() => {
+    sys("Ascendancy Directorate Archive Terminal — Session initialized.");
+    sys(`Operator: ${STATE.username} // Clearance: ${CL_NAMES[STATE.clearance]} // Monitoring: ACTIVE`);
+    sep();
+    jet(rand(RESPONSES.greeting) + "\n\n" + rand(RESPONSES.identity));
+    sep();
+    setTimeout(() => sys("Query any year 2001–2171. Use sidebar folders to navigate."), 800);
+  }, 200);
+}
+</script>
+</body>
+</html>
