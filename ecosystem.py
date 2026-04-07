@@ -29,9 +29,6 @@ ZOOM_MAX = 2.0
 # Balanced drain rates
 DRAIN_MULTIPLIER = 1.2
 
-# Spawn rate multiplier (adjustable via /spawnrate command)
-SPAWN_RATE_MULT = 1.0
-
 # Camera pan speed (pixels per second in world coords)
 CAM_PAN_SPEED = 600
 
@@ -1511,7 +1508,7 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_q:
+                if event.key == pygame.K_q and not command_input.active:
                     running = False
                 elif event.key == pygame.K_ESCAPE:
                     if selected:
