@@ -1494,6 +1494,7 @@ class World:
             lighter = (WATER_DEEP[0]+15, WATER_DEEP[1]+15, min(255, WATER_DEEP[2]+20))
             pygame.draw.line(surf, lighter, (sx1, sy1), (sx2, sy2), w2)
         # Layer 3: Animated ripples
+        ripple_col = (min(255, WATER_LIGHT[0]+20), min(255, WATER_LIGHT[1]+20), min(255, WATER_LIGHT[2]+10))
         for i in range(0, len(self.river_path), 8):
             rx, ry = self.river_path[i]
             if not (vr[0] <= rx <= vr[0]+vr[2] and vr[1] <= ry <= vr[1]+vr[3]):
@@ -1502,7 +1503,6 @@ class World:
             rsx, rsy = camera.world_to_screen(rx + offset, ry + offset * 0.5)
             rw = max(2, int(12 * z))
             rh = max(1, int(3 * z))
-            ripple_col = (min(255, WATER_LIGHT[0]+20), min(255, WATER_LIGHT[1]+20), min(255, WATER_LIGHT[2]+10))
             pygame.draw.ellipse(surf, ripple_col, (rsx - rw//2, rsy - rh//2, rw, rh))
 
         # Draw branch tributaries
