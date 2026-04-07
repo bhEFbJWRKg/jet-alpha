@@ -187,6 +187,59 @@ def build_river_rects(river_path, base_width=90):
         rects.append(pygame.Rect(int(x - half), int(y - half * 0.6), int(w), int(w * 0.6)))
     return rects
 
+def generate_branch_points(main_path, world_w, world_h, seed=77):
+    """Generate tributary branches that split off from the main river."""
+    rng = random.Random(seed)
+    branches = []
+    # Pick 4-5 points along the main river to branch from
+    branch_indices = sorted(rng.sample(range(20, len(main_path) - 20, 3), min(5, len(main_path) // 50)))
+    for idx in branch_indices:
+        start_x, start_y = main_path[idx]
+        # Branch goes in a perpendicular-ish direction
+        if idx + 1 < len(main_path):
+            dx = main_path[idx+1][0] - main_path[idx][0]
+            dy = main_path[idx+1][1] - main_path[idx][1]
+        else:
+            dx, dy = 1, 0
+        # Perpendicular direction (randomly left or right)
+        side = rng.choice([-1, 1])
+        perp_x, perp_y = -dy * side, dx * side
+        mag = math.hypot(perp_x, perp_y)
+        if mag > 0:
+            perp_x /= mag
+            perp_y /= mag
+        # Generate 6-8 control points for the branch
+        num_pts = rng.randint(6, 8)
+        pts = [(start_x, start_y)]
+        for j in range(1, num_pts):
+            t = j / (num_pts - 1)
+            # Branch curves away from main river
+            bx = start_x + perp_x * t * rng.uniform(400, 900)
+            by = start_y + perp_y * t * rng.uniform(400, 900)
+            # Add some random wandering
+            bx += rng.uniform(-120, 120)
+            by += rng.uniform(-120, 120)
+            bx = clamp(bx, 40, world_w - 40)
+            by = clamp(by, 40, world_h - 40)
+            pts.append((bx, by))
+        branch_path = interpolate_river(pts, segments_per_span=12)
+        branches.append(branch_path)
+    return branches
+
+def build_branch_rects(branch_paths, base_width=35):
+    """Build collision rects for branch rivers (thinner than main)."""
+    all_rects = []
+    rng = random.Random(456)
+    for path in branch_paths:
+        for i, (x, y) in enumerate(path):
+            t = i / max(1, len(path) - 1)
+            # Branches taper toward the end
+            w = base_width * (1.0 - t * 0.6) + rng.uniform(-8, 8)
+            w = max(10, w)
+            half = w / 2
+            all_rects.append(pygame.Rect(int(x - half), int(y - half * 0.6), int(w), int(w * 0.6)))
+    return all_rects
+
 def rand_land(water_zones, sim_w, sim_h):
     for _ in range(500):
         x = random.randint(12, sim_w - 12)
@@ -740,12 +793,14 @@ class Animal:
             self.state = State.WANDER
             self.target = None
 
+    # Cycle of life food chain: rabbit < fox < wolf < bear < tiger
+    # Each predator hunts those below it in the chain
     PREY_TABLE = {
-        'alligator': ('pig', 'rabbit', 'deer', 'bird'),
-        'tiger': ('deer', 'pig', 'rabbit', 'bird'),
-        'wolf': ('deer', 'rabbit', 'bird'),
-        'bear': ('deer', 'pig', 'rabbit'),
-        'fox': ('rabbit', 'bird'),
+        'fox': ('rabbit', 'bird', 'bee'),
+        'wolf': ('rabbit', 'deer', 'bird', 'fox'),
+        'bear': ('deer', 'pig', 'rabbit', 'fox', 'wolf'),
+        'tiger': ('deer', 'pig', 'rabbit', 'bird', 'fox', 'wolf'),
+        'alligator': ('pig', 'rabbit', 'deer', 'bird', 'fox'),
     }
 
     def _do_hunt(self, dt, world):
@@ -865,6 +920,10 @@ class Bee(Animal):
     def __init__(self, x, y):
         super().__init__('bee', x, y, speed=250, size=5, diet='bee', color=ANIMAL_COLORS['bee'])
         self.poll_target = None
+        self.hive_pos = [float(x), float(y)]  # Remember hive location
+        self.has_pollen = False
+        self.returning_to_hive = False
+        self.pollen_drop_timer = 0.0
 
     def update(self, dt, world):
         self.age += dt
@@ -881,17 +940,56 @@ class Bee(Animal):
             self.state = State.SLEEP
             self._do_sleep(dt)
             return
-        if self.poll_target is None or not self.poll_target.alive:
-            flowers = [e for e in world.entities if isinstance(e, Flower) and e.alive]
-            self.poll_target = random.choice(flowers) if flowers else None
-        if self.poll_target:
-            d = self._move_toward(self.poll_target.pos, dt)
-            if d < 20:
-                self.poll_target.pollinate()
-                self.hunger = min(100, self.hunger + 6)
-                self.poll_target = None
+        # Bees shelter during rain (stay near hive, move slowly)
+        if world.weather in ('rain', 'storm'):
+            d = dist(self.pos, self.hive_pos)
+            if d > 60:
+                self._move_toward(self.hive_pos, dt, mult=0.5)
+            self.state = State.REST
+            return
+        # Pollination behavior
+        if self.returning_to_hive:
+            # Returning to hive with pollen, dropping flowers along the way
+            self.state = State.POLLINATE
+            self.pollen_drop_timer -= dt
+            if self.pollen_drop_timer <= 0:
+                self.pollen_drop_timer = random.uniform(1.5, 3.0)
+                # Drop a flower along the path
+                if self.has_pollen and random.random() < 0.4:
+                    fx = self.pos[0] + random.uniform(-30, 30)
+                    fy = self.pos[1] + random.uniform(-30, 30)
+                    fx = clamp(fx, 6, world.sim_w - 6)
+                    fy = clamp(fy, 6, world.sim_h - 6)
+                    if not in_water([fx, fy], world.water_zones):
+                        flower_count = sum(1 for e in world.entities if isinstance(e, Flower))
+                        if flower_count < Flower.MAX:
+                            world.to_add.append(Flower(fx, fy))
+                            world.to_add.append(Particle(fx, fy, C_FLOWER_Y, speed=1.0, life=1.5, size=3))
+            d = self._move_toward(self.hive_pos, dt)
+            if d < 30:
+                self.returning_to_hive = False
+                self.has_pollen = False
+                self.hunger = min(100, self.hunger + 15)
+                # Pollen particles at hive
+                for _ in range(3):
+                    world.to_add.append(Particle(self.hive_pos[0], self.hive_pos[1], (255, 220, 50), speed=1.5, life=1.0, size=3))
         else:
-            self._do_wander(dt, world)
+            # Looking for flowers to pollinate
+            if self.poll_target is None or not self.poll_target.alive:
+                flowers = [e for e in world.entities if isinstance(e, Flower) and e.alive]
+                self.poll_target = random.choice(flowers) if flowers else None
+            if self.poll_target:
+                self.state = State.POLLINATE
+                d = self._move_toward(self.poll_target.pos, dt)
+                if d < 20:
+                    self.poll_target.pollinate()
+                    self.hunger = min(100, self.hunger + 6)
+                    self.has_pollen = True
+                    self.returning_to_hive = True
+                    self.pollen_drop_timer = random.uniform(1.0, 2.5)
+                    self.poll_target = None
+            else:
+                self._do_wander(dt, world)
         self.pos[0] = clamp(self.pos[0], 6, world.sim_w-6)
         self.pos[1] = clamp(self.pos[1], 6, world.sim_h-6)
 
@@ -1088,8 +1186,9 @@ class Bird(Animal):
             pygame.draw.circle(surf, WHITE, (sx, sy), s+4, 2)
         self.draw_health_bar(surf, camera)
 
+# Food chain: rabbit/bird/bee < fox < wolf < bear/tiger, alligator is apex aquatic
 PREDATOR_TYPES = (Alligator, Tiger, Wolf, Fox, Bear)
-PREY_TYPES = (Rabbit, Pig, Deer, Bird)
+PREY_TYPES = (Rabbit, Pig, Deer, Bird, Fox)  # Fox is both predator and prey
 
 # ────────────────────────────────────────────────────────────────────────────────
 #  WORLD
@@ -1109,7 +1208,16 @@ class World:
         # River data
         self.river_points = generate_river_points(sim_w, sim_h)
         self.river_path = interpolate_river(self.river_points, segments_per_span=25)
+        # Branch tributaries
+        self.branch_paths = generate_branch_points(self.river_path, sim_w, sim_h)
         self._build_water_zones()
+        # Weather system
+        self.weather = 'clear'  # 'clear', 'rain', 'storm'
+        self.weather_timer = random.uniform(30, 60)
+        self.rain_intensity = 0.0  # 0.0 to 1.0
+        self.rain_drops = []  # list of (x, y, speed, life) for visible rain
+        self.lightning_timer = 0.0
+        self.lightning_flash = 0.0
         # Ground detail rocks (pre-generated for performance)
         self.ground_details = []
         rng = random.Random(999)
@@ -1123,8 +1231,9 @@ class World:
         self._setup()
 
     def _build_water_zones(self):
-        """Build collision rects from river path."""
+        """Build collision rects from river path and branches."""
         self.water_zones = build_river_rects(self.river_path, base_width=90)
+        self.water_zones.extend(build_branch_rects(self.branch_paths, base_width=35))
 
     def _setup(self):
         # Spawn plants
@@ -1215,7 +1324,6 @@ class World:
         self.sim_h = new_h
 
     def update(self, dt):
-        global SPAWN_RATE_MULT
         self.time += dt
         self.temp_timer -= dt
         if self.temp_timer <= 0:
@@ -1228,6 +1336,83 @@ class World:
             y = random.uniform(50, self.sim_h-50)
             if not in_water([x,y], self.water_zones):
                 self.to_add.append(Fire(x, y))
+
+        # Weather system
+        self.weather_timer -= dt
+        if self.weather_timer <= 0:
+            if self.weather == 'clear':
+                self.weather = random.choice(['rain', 'rain', 'storm'])
+                self.weather_timer = random.uniform(15, 40)
+                self.rain_intensity = 0.3 if self.weather == 'rain' else 0.7
+            else:
+                self.weather = 'clear'
+                self.weather_timer = random.uniform(30, 80)
+                self.rain_intensity = 0.0
+                self.rain_drops.clear()
+
+        # Update rain
+        if self.weather in ('rain', 'storm'):
+            # Ramp up intensity
+            target = 0.5 if self.weather == 'rain' else 1.0
+            self.rain_intensity += (target - self.rain_intensity) * dt * 0.5
+            # Spawn rain drops in visible area
+            num_new = int(self.rain_intensity * 40 * dt * 60)
+            for _ in range(min(num_new, 30)):
+                rx = random.uniform(0, self.sim_w)
+                ry = random.uniform(0, self.sim_h)
+                rspd = random.uniform(300, 600)
+                self.rain_drops.append([rx, ry, rspd, random.uniform(0.3, 0.8)])
+            # Update existing drops
+            new_drops = []
+            for rd in self.rain_drops:
+                rd[1] += rd[2] * dt
+                rd[3] -= dt
+                if rd[3] > 0 and rd[1] < self.sim_h:
+                    new_drops.append(rd)
+            self.rain_drops = new_drops
+            # Rain cools temperature
+            self.temperature = max(5, self.temperature - dt * 0.3 * self.rain_intensity)
+            # Rain helps plants grow faster (water the land)
+            if random.random() < 0.01 * self.rain_intensity:
+                for e in self.entities:
+                    if isinstance(e, Plant) and e.alive:
+                        e.spread_timer -= 0.5
+            # Storms: lightning and fire
+            if self.weather == 'storm':
+                self.lightning_timer -= dt
+                if self.lightning_timer <= 0:
+                    self.lightning_timer = random.uniform(3, 10)
+                    self.lightning_flash = 0.4
+                    # Lightning can start fires
+                    if random.random() < 0.3:
+                        x = random.uniform(50, self.sim_w-50)
+                        y = random.uniform(50, self.sim_h-50)
+                        if not in_water([x,y], self.water_zones):
+                            self.to_add.append(Fire(x, y))
+                    # Lightning can damage nearby animals
+                    lx = random.uniform(100, self.sim_w-100)
+                    ly = random.uniform(100, self.sim_h-100)
+                    for e in self.entities:
+                        if isinstance(e, Animal) and e.alive and dist(e.pos, [lx, ly]) < 80:
+                            e.health -= random.uniform(15, 35)
+                            if e.health <= 0:
+                                e.alive = False
+            # Decay lightning flash
+            if self.lightning_flash > 0:
+                self.lightning_flash -= dt * 2
+                if self.lightning_flash < 0:
+                    self.lightning_flash = 0
+            # Rain puts out fires
+            if self.weather in ('rain', 'storm'):
+                for e in self.entities:
+                    if isinstance(e, Fire) and e.alive:
+                        e.life -= dt * 2 * self.rain_intensity
+        else:
+            self.rain_intensity = max(0, self.rain_intensity - dt)
+            if self.lightning_flash > 0:
+                self.lightning_flash -= dt * 2
+                if self.lightning_flash < 0:
+                    self.lightning_flash = 0
 
         # Periodic mob spawning
         self.spawn_timer -= dt
@@ -1320,6 +1505,67 @@ class World:
             ripple_col = (min(255, WATER_LIGHT[0]+20), min(255, WATER_LIGHT[1]+20), min(255, WATER_LIGHT[2]+10))
             pygame.draw.ellipse(surf, ripple_col, (rsx - rw//2, rsy - rh//2, rw, rh))
 
+        # Draw branch tributaries
+        for bp in self.branch_paths:
+            # Bank edges
+            for i in range(0, len(bp) - 1, 2):
+                x1, y1 = bp[i]
+                x2, y2 = bp[min(i+2, len(bp)-1)]
+                mid_x = (x1 + x2) / 2
+                mid_y = (y1 + y2) / 2
+                if not (vr[0] <= mid_x <= vr[0]+vr[2] and vr[1] <= mid_y <= vr[1]+vr[3]):
+                    continue
+                sx1, sy1 = camera.world_to_screen(x1, y1)
+                sx2, sy2 = camera.world_to_screen(x2, y2)
+                t = i / max(1, len(bp) - 1)
+                width_base = 28 * (1.0 - t * 0.5) + 6 * math.sin(i * 0.08)
+                bank_w = max(2, int(width_base * z))
+                pygame.draw.line(surf, (22, 42, 16), (sx1, sy1), (sx2, sy2), bank_w)
+            # Water
+            for i in range(len(bp) - 1):
+                x1, y1 = bp[i]
+                x2, y2 = bp[i + 1]
+                mid_x = (x1 + x2) / 2
+                mid_y = (y1 + y2) / 2
+                if not (vr[0] <= mid_x <= vr[0]+vr[2] and vr[1] <= mid_y <= vr[1]+vr[3]):
+                    continue
+                sx1, sy1 = camera.world_to_screen(x1, y1)
+                sx2, sy2 = camera.world_to_screen(x2, y2)
+                t = i / max(1, len(bp) - 1)
+                width_base = 20 * (1.0 - t * 0.5) + 4 * math.sin(i * 0.08)
+                w = max(2, int(width_base * z))
+                pygame.draw.line(surf, WATER_DEEP, (sx1, sy1), (sx2, sy2), w)
+                w2 = max(1, int(width_base * 0.5 * z))
+                lighter = (WATER_DEEP[0]+15, WATER_DEEP[1]+15, min(255, WATER_DEEP[2]+20))
+                pygame.draw.line(surf, lighter, (sx1, sy1), (sx2, sy2), w2)
+            # Ripples on branches
+            for i in range(0, len(bp), 12):
+                rx, ry = bp[i]
+                if not (vr[0] <= rx <= vr[0]+vr[2] and vr[1] <= ry <= vr[1]+vr[3]):
+                    continue
+                offset = math.sin(self.time * 2.5 + i * 0.4) * 4
+                rsx, rsy = camera.world_to_screen(rx + offset, ry + offset * 0.5)
+                rw = max(1, int(7 * z))
+                rh = max(1, int(2 * z))
+                pygame.draw.ellipse(surf, ripple_col, (rsx - rw//2, rsy - rh//2, rw, rh))
+
+        # Draw rain drops if raining
+        if self.weather in ('rain', 'storm'):
+            rain_col = (140, 160, 200, 120) if self.weather == 'rain' else (180, 190, 220, 150)
+            for rd in self.rain_drops:
+                rdx, rdy, rdspd, rdlife = rd
+                if vr[0] <= rdx <= vr[0]+vr[2] and vr[1] <= rdy <= vr[1]+vr[3]:
+                    sx, sy = camera.world_to_screen(rdx, rdy)
+                    length = max(2, int(rdspd * 0.02 * z))
+                    pygame.draw.line(surf, (140, 160, 200), (sx, sy), (sx, sy + length), max(1, int(z)))
+
+        # Lightning flash overlay
+        if self.lightning_flash > 0:
+            flash_alpha = int(min(80, self.lightning_flash * 200))
+            flash_surf = pygame.Surface((surf.get_width(), surf.get_height()), pygame.SRCALPHA)
+            flash_surf.fill((255, 255, 240, flash_alpha))
+            surf.blit(flash_surf, (0, 0))
+
         # Cull entities outside view
         visible_rect = vr
         for e in self.entities:
@@ -1401,70 +1647,250 @@ class TextInput:
             cursor_x = self.rect.x + 5 + self.font.size(txt)[0]
             pygame.draw.line(surf, WHITE, (cursor_x, self.rect.y+4), (cursor_x, self.rect.y+self.rect.h-4), 2)
 
+def _draw_section_header(surf, sfont, text, x, y, w, color=(85, 170, 65)):
+    """Draw a styled section header with lines on both sides."""
+    lbl = sfont.render(text, True, color)
+    lw = lbl.get_width()
+    line_y = y + lbl.get_height() // 2
+    margin = 8
+    left_end = x + margin
+    right_end = x + w - margin
+    text_x = x + (w - lw) // 2
+    if text_x - 4 > left_end:
+        pygame.draw.line(surf, (55, 75, 45), (left_end, line_y), (text_x - 4, line_y), 1)
+    if text_x + lw + 4 < right_end:
+        pygame.draw.line(surf, (55, 75, 45), (text_x + lw + 4, line_y), (right_end, line_y), 1)
+    surf.blit(lbl, (text_x, y))
+    return lbl.get_height() + 4
+
+def _draw_bar(surf, x, y, w, h, value, max_val, fg_color, bg_color=C_BAR_BG, border_radius=3):
+    """Draw a small progress bar."""
+    pygame.draw.rect(surf, bg_color, (x, y, w, h), border_radius=border_radius)
+    fill = int((value / max_val) * w) if max_val > 0 else 0
+    if fill > 0:
+        pygame.draw.rect(surf, fg_color, (x, y, min(fill, w), h), border_radius=border_radius)
+
 def draw_panel(surf, world, selected, font, sfont, tiny_font, panel_x, sim_time, time_scale, temperature, command_input):
-    pygame.draw.rect(surf, PANEL_BG, (panel_x, 0, PANEL_W, surf.get_height()))
-    pygame.draw.line(surf, PANEL_LINE, (panel_x, 0), (panel_x, surf.get_height()), 2)
+    h = surf.get_height()
+    pw = PANEL_W
 
-    y = 10
-    title = font.render('🌿 Ecosystem', True, (95, 200, 75))
-    surf.blit(title, (panel_x + 10, y)); y += 30
-    t_lbl = sfont.render(f'Time: {sim_time:.0f}s', True, GREY)
-    surf.blit(t_lbl, (panel_x + 10, y)); y += 20
-    temp_lbl = sfont.render(f'Temperature: {temperature:.1f}°C', True, (255,200,100) if temperature>40 else (150,200,255))
-    surf.blit(temp_lbl, (panel_x + 10, y)); y += 26
+    # Panel background with subtle gradient
+    for gy in range(h):
+        t = gy / max(1, h)
+        r = int(18 + t * 6)
+        g = int(22 + t * 8)
+        b = int(14 + t * 4)
+        pygame.draw.line(surf, (r, g, b), (panel_x, gy), (panel_x + pw, gy))
+    # Left border accent
+    pygame.draw.line(surf, (60, 100, 45), (panel_x, 0), (panel_x, h), 2)
 
-    if selected and selected.alive:
-        selected.draw_stats_panel(surf, panel_x, font, sfont)
-        y = 435
+    y = 8
+    # ── Title ──
+    title = font.render('Ecosystem Sim', True, (110, 220, 85))
+    surf.blit(title, (panel_x + 12, y))
+    # Version badge
+    ver = tiny_font.render('v2.0', True, (80, 130, 65))
+    surf.blit(ver, (panel_x + pw - 36, y + 4))
+    y += 28
+
+    # ── Status bar: time, temp, weather ──
+    pygame.draw.rect(surf, (28, 35, 22), (panel_x + 6, y, pw - 12, 52), border_radius=5)
+    # Time
+    t_lbl = tiny_font.render(f'Time: {sim_time:.0f}s', True, (160, 180, 150))
+    surf.blit(t_lbl, (panel_x + 12, y + 4))
+    # Temperature with color coding
+    if temperature > 45:
+        temp_col = (255, 100, 80)
+    elif temperature > 35:
+        temp_col = (255, 200, 100)
+    elif temperature < 15:
+        temp_col = (100, 160, 255)
     else:
-        y = 80
+        temp_col = (150, 220, 150)
+    temp_lbl = tiny_font.render(f'Temp: {temperature:.1f}C', True, temp_col)
+    surf.blit(temp_lbl, (panel_x + pw // 2 + 5, y + 4))
+    # Weather indicator
+    weather_icons = {'clear': 'Clear', 'rain': 'Rain', 'storm': 'Storm'}
+    weather_colors = {'clear': (200, 220, 140), 'rain': (100, 150, 220), 'storm': (180, 120, 220)}
+    w_name = weather_icons.get(world.weather, 'Clear')
+    w_col = weather_colors.get(world.weather, (200, 200, 200))
+    w_lbl = sfont.render(f'Weather: {w_name}', True, w_col)
+    surf.blit(w_lbl, (panel_x + 12, y + 20))
+    # Rain intensity bar
+    if world.weather != 'clear':
+        _draw_bar(surf, panel_x + pw // 2 + 5, y + 25, pw // 2 - 18, 6, world.rain_intensity, 1.0, w_col)
+        ri_lbl = tiny_font.render(f'{world.rain_intensity*100:.0f}%', True, w_col)
+        surf.blit(ri_lbl, (panel_x + pw - 38, y + 20))
+    y += 58
 
-    sep = sfont.render('── Populations ──', True, (115, 158, 85))
-    surf.blit(sep, (panel_x + 10, y)); y += 24
+    # ── Selected entity details ──
+    if selected and selected.alive:
+        y += _draw_section_header(surf, sfont, 'Selected', panel_x, y, pw, (200, 200, 120))
+        pygame.draw.rect(surf, (30, 38, 24), (panel_x + 6, y, pw - 12, 105), border_radius=5)
+        name_col = ANIMAL_COLORS.get(selected.kind, (200, 200, 200)) if hasattr(selected, 'kind') else (148, 195, 132)
+        name_text = selected.kind.capitalize() if hasattr(selected, 'kind') else type(selected).__name__
+        n_lbl = sfont.render(name_text, True, name_col)
+        surf.blit(n_lbl, (panel_x + 14, y + 4))
+
+        if isinstance(selected, Animal):
+            # State badge
+            state_text = selected.state.name.replace('_', ' ').title()
+            st_lbl = tiny_font.render(state_text, True, (180, 180, 130))
+            surf.blit(st_lbl, (panel_x + pw - st_lbl.get_width() - 14, y + 6))
+            # Stat bars
+            bar_x = panel_x + 14
+            bar_w = pw - 36
+            bar_h = 6
+            stats_info = [
+                ('HP', selected.health, 100, (220, 60, 60)),
+                ('Food', selected.hunger, 100, (220, 180, 60)),
+                ('Water', selected.thirst, 100, (60, 140, 220)),
+                ('Sleep', selected.sleep_v, 100, (140, 100, 200)),
+                ('Stamina', selected.stamina, 100, (60, 200, 120)),
+            ]
+            by = y + 22
+            for label, val, mx, col in stats_info:
+                l = tiny_font.render(f'{label}', True, (140, 150, 130))
+                surf.blit(l, (bar_x, by))
+                _draw_bar(surf, bar_x + 48, by + 2, bar_w - 78, bar_h, val, mx, col)
+                v = tiny_font.render(f'{val:.0f}', True, (140, 150, 130))
+                surf.blit(v, (bar_x + bar_w - 24, by))
+                by += 15
+            # Age
+            age_lbl = tiny_font.render(f'Age: {selected.age:.0f}s', True, (140, 150, 130))
+            surf.blit(age_lbl, (bar_x, by + 2))
+            # Pollen indicator for bees
+            if isinstance(selected, Bee):
+                pollen_txt = 'Has Pollen' if selected.has_pollen else 'No Pollen'
+                pollen_col = (255, 220, 50) if selected.has_pollen else (100, 100, 80)
+                pl = tiny_font.render(pollen_txt, True, pollen_col)
+                surf.blit(pl, (bar_x + 60, by + 2))
+        y += 112
+    else:
+        y += 4
+
+    # ── Food Chain ──
+    y += _draw_section_header(surf, sfont, 'Food Chain', panel_x, y, pw, (200, 160, 100))
+    pygame.draw.rect(surf, (28, 35, 22), (panel_x + 6, y, pw - 12, 36), border_radius=4)
+    chain_items = [
+        ('Rabbit', (180, 160, 120)),
+        ('Fox', (200, 130, 60)),
+        ('Wolf', (140, 140, 150)),
+        ('Bear', (140, 90, 50)),
+    ]
+    cx = panel_x + 12
+    for i, (name, col) in enumerate(chain_items):
+        lbl = tiny_font.render(name, True, col)
+        surf.blit(lbl, (cx, y + 5))
+        cx += lbl.get_width() + 2
+        if i < len(chain_items) - 1:
+            arrow = tiny_font.render('>', True, (100, 120, 80))
+            surf.blit(arrow, (cx, y + 5))
+            cx += arrow.get_width() + 2
+    # Second row
+    chain2 = [('Deer', (160, 140, 90)), ('Pig', (200, 150, 150)), ('Bird', (100, 180, 220))]
+    cx = panel_x + 12
+    for i, (name, col) in enumerate(chain2):
+        lbl = tiny_font.render(name, True, col)
+        surf.blit(lbl, (cx, y + 19))
+        cx += lbl.get_width() + 6
+    prey_lbl = tiny_font.render('(prey)', True, (80, 100, 70))
+    surf.blit(prey_lbl, (cx, y + 19))
+    y += 42
+
+    # ── Populations ──
+    y += _draw_section_header(surf, sfont, 'Populations', panel_x, y, pw)
     counts = world.counts()
-    order = ['Grass','Flower','Tree','BerryBush','Mushroom',
-             'Bee','Rabbit','Pig','Deer','Alligator','Tiger','Wolf','Fox','Bear','Bird']
-    for name in order:
+    # Group: Flora
+    flora_order = ['Grass', 'Flower', 'Tree', 'BerryBush', 'Mushroom']
+    fauna_prey = ['Rabbit', 'Deer', 'Pig', 'Bird']
+    fauna_pred = ['Fox', 'Wolf', 'Bear', 'Tiger', 'Alligator']
+    fauna_other = ['Bee']
+
+    total_entities = sum(counts.values())
+
+    def draw_pop_row(name, count, col, x, y_pos):
+        dot_r = 3
+        pygame.draw.circle(surf, col, (x + dot_r, y_pos + 7), dot_r)
+        lbl = tiny_font.render(f'{name}', True, col)
+        surf.blit(lbl, (x + 10, y_pos))
+        num = tiny_font.render(f'{count}', True, (160, 170, 150))
+        surf.blit(num, (panel_x + pw - num.get_width() - 12, y_pos))
+        return 14
+
+    # Flora
+    fl_lbl = tiny_font.render('Flora:', True, (100, 160, 80))
+    surf.blit(fl_lbl, (panel_x + 10, y)); y += 14
+    for name in flora_order:
         n = counts.get(name, 0)
         if n == 0: continue
         col = ANIMAL_COLORS.get(name.lower(), (148, 195, 132))
-        lbl = sfont.render(f'{name}: {n}', True, col)
-        surf.blit(lbl, (panel_x + 10, y)); y += 19
-        if y > surf.get_height() - 200:
-            break
+        y += draw_pop_row(name, n, col, panel_x + 14, y)
 
-    # Slider moved higher (above commands)
-    slider_y = surf.get_height() - 150
+    # Prey
+    fp_lbl = tiny_font.render('Prey:', True, (180, 160, 100))
+    surf.blit(fp_lbl, (panel_x + 10, y)); y += 14
+    for name in fauna_prey:
+        n = counts.get(name, 0)
+        if n == 0: continue
+        col = ANIMAL_COLORS.get(name.lower(), (180, 180, 180))
+        y += draw_pop_row(name, n, col, panel_x + 14, y)
+
+    # Predators
+    pr_lbl = tiny_font.render('Predators:', True, (200, 100, 80))
+    surf.blit(pr_lbl, (panel_x + 10, y)); y += 14
+    for name in fauna_pred:
+        n = counts.get(name, 0)
+        if n == 0: continue
+        col = ANIMAL_COLORS.get(name.lower(), (180, 180, 180))
+        y += draw_pop_row(name, n, col, panel_x + 14, y)
+
+    # Other (bees)
+    for name in fauna_other:
+        n = counts.get(name, 0)
+        if n == 0: continue
+        col = ANIMAL_COLORS.get(name.lower(), (180, 180, 180))
+        y += draw_pop_row(name, n, col, panel_x + 14, y)
+
+    # Total
+    tot_lbl = tiny_font.render(f'Total: {total_entities}', True, (130, 140, 120))
+    surf.blit(tot_lbl, (panel_x + 10, y)); y += 18
+
+    # ── Speed slider ──
+    slider_y = h - 150
     slider_x = panel_x + 20
-    slider_w = PANEL_W - 40
+    slider_w = pw - 40
     slider_h = 8
+    y += _draw_section_header(surf, sfont, 'Speed', panel_x, min(y, slider_y - 22), pw, (150, 180, 200))
     pygame.draw.rect(surf, C_BAR_BG, (slider_x, slider_y, slider_w, slider_h), border_radius=4)
     log_min = math.log(0.01)
     log_max = math.log(100.0)
-    log_val = math.log(time_scale)
+    log_val = math.log(max(0.01, time_scale))
     t = (log_val - log_min) / (log_max - log_min)
     fill_w = int(t * slider_w)
     if fill_w > 0:
         pygame.draw.rect(surf, (100, 200, 255), (slider_x, slider_y, fill_w, slider_h), border_radius=4)
-    knob_x = slider_x + fill_w - 4
-    pygame.draw.circle(surf, WHITE, (knob_x, slider_y + slider_h//2), 6)
-    lbl = sfont.render(f'Speed: {time_scale:.2f}x', True, WHITE)
-    surf.blit(lbl, (panel_x + 20, slider_y - 18))
-    surf.blit(tiny_font.render('0.01x', True, GREY), (slider_x, slider_y + 10))
-    surf.blit(tiny_font.render('100x', True, GREY), (slider_x + slider_w - 25, slider_y + 10))
+    knob_x = slider_x + fill_w
+    pygame.draw.circle(surf, WHITE, (knob_x, slider_y + slider_h // 2), 6)
+    pygame.draw.circle(surf, (100, 200, 255), (knob_x, slider_y + slider_h // 2), 4)
+    lbl = sfont.render(f'{time_scale:.2f}x', True, WHITE)
+    surf.blit(lbl, (panel_x + pw - lbl.get_width() - 14, slider_y - 18))
+    surf.blit(tiny_font.render('0.01x', True, GREY), (slider_x, slider_y + 12))
+    surf.blit(tiny_font.render('100x', True, GREY), (slider_x + slider_w - 25, slider_y + 12))
 
-    # Command input section
-    cmd_y = surf.get_height() - 80
-    pygame.draw.line(surf, PANEL_LINE, (panel_x+5, cmd_y-5), (panel_x+PANEL_W-5, cmd_y-5), 1)
-    cmd_label = sfont.render('Commands:', True, (150,150,150))
-    surf.blit(cmd_label, (panel_x+10, cmd_y))
+    # ── Command input ──
+    cmd_y = h - 80
+    pygame.draw.line(surf, (55, 75, 45), (panel_x + 8, cmd_y - 6), (panel_x + pw - 8, cmd_y - 6), 1)
+    cmd_label = tiny_font.render('Commands: /fire /summon /kill /spawnrate /temperature', True, (100, 110, 90))
+    surf.blit(cmd_label, (panel_x + 10, cmd_y - 4))
     command_input.rect.x = panel_x + 10
-    command_input.rect.y = cmd_y + 18
+    command_input.rect.y = cmd_y + 12
     command_input.draw(surf)
 
-    pygame.draw.line(surf, PANEL_LINE, (panel_x + 5, surf.get_height()-30), (panel_x + PANEL_W - 5, surf.get_height()-30), 1)
-    ctrl = sfont.render('WASD/drag: pan • Scroll: zoom', True, (75,98,65))
-    surf.blit(ctrl, (panel_x + 10, surf.get_height()-22))
+    # ── Controls footer ──
+    pygame.draw.line(surf, (55, 75, 45), (panel_x + 8, h - 28), (panel_x + pw - 8, h - 28), 1)
+    ctrl = tiny_font.render('WASD: pan | Scroll: zoom | /: cmd | Q: quit', True, (70, 90, 60))
+    surf.blit(ctrl, (panel_x + 10, h - 22))
 
 # ────────────────────────────────────────────────────────────────────────────────
 #  MAIN
